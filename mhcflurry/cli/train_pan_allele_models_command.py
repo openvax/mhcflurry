@@ -507,14 +507,7 @@ def initialize_training(args):
     allele_sequences = pandas.read_csv(
         args.allele_sequences, index_col=0).iloc[:,0]
 
-    # pyarrow parser is 3–10× faster than the default C engine for
-    # typical CSV. Still bzip2-bound on the I/O side but the parse phase
-    # becomes negligible. Falls back to C engine if pyarrow isn't
-    # installed (it's a pandas optional dep).
-    try:
-        df = pandas.read_csv(args.data, engine="pyarrow")
-    except (ImportError, ValueError):
-        df = pandas.read_csv(args.data)
+    df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
 
     # Canonicalize allele names to the pseudosequence key set (no-alias-first),

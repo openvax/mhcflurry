@@ -320,8 +320,7 @@ def test_426_flanking_encoding_error_message_wording():
         c_flanks=["", ""],
     )
     with pytest.raises(EncodingError) as exc:
-        enc.vector_encode(
-            vector_encoding_name="BLOSUM62",
+        enc.categorical_encode(
             peptide_max_length=15,
             n_flank_length=5,
             c_flank_length=5,

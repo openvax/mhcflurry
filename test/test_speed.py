@@ -110,9 +110,9 @@ def test_speed_allele_specific(predictors, profile=False, num=DEFAULT_NUM_PREDIC
 
     NUM2 = 10000
     peptides = EncodableSequences.create(random_peptides(NUM2, length=13))
-    start("encode_blosum_%d" % NUM2)
-    peptides.variable_length_to_fixed_length_vector_encoding("BLOSUM62")
-    end("encode_blosum_%d" % NUM2)
+    start("encode_categorical_%d" % NUM2)
+    peptides.variable_length_to_fixed_length_categorical()
+    end("encode_categorical_%d" % NUM2)
 
     start("pred_already_encoded_%d" % NUM2)
     predictor.predict(peptides, allele="HLA-A*02:01")

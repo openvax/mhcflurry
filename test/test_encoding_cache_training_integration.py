@@ -52,13 +52,16 @@ DEFAULT_PEPTIDE_ENCODING = {
     "max_length": 15,
     "vector_encoding_name": "BLOSUM62",
 }
+_PREENCODED_ALIGN = {
+    "alignment_method": "left_pad_centered_right_pad",
+    "max_length": 15,
+}
 _PREENCODED_BATCHES = [
     (
         {
             "peptide": EncodableSequences(TRAIN_PEPTIDES[:4])
-            .variable_length_to_fixed_length_vector_encoding(
-                **DEFAULT_PEPTIDE_ENCODING
-            ),
+            .variable_length_to_fixed_length_categorical(**_PREENCODED_ALIGN)
+            .astype("int8"),
             "allele": numpy.array([0, 1, 2, 0], dtype=numpy.int64),
         },
         numpy.array([0.05, 0.25, 0.75, 0.95], dtype=numpy.float32),
@@ -66,9 +69,8 @@ _PREENCODED_BATCHES = [
     (
         {
             "peptide": EncodableSequences(TRAIN_PEPTIDES[4:8])
-            .variable_length_to_fixed_length_vector_encoding(
-                **DEFAULT_PEPTIDE_ENCODING
-            ),
+            .variable_length_to_fixed_length_categorical(**_PREENCODED_ALIGN)
+            .astype("int8"),
             "allele": numpy.array([1, 2, 0, 1], dtype=numpy.int64),
         },
         numpy.array([0.15, 0.35, 0.65, 0.85], dtype=numpy.float32),

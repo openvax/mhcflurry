@@ -318,55 +318,52 @@ def test_peptide_amino_acid_encoding_torch_default_and_legacy_alias():
     ],
 )
 def test_index_embedding_matches_dense_vector_forward(encoding_name):
-    """The production index-embedding peptide path is bit-identical to the
-    (retained, test-only) dense ``(N, L, V)`` vector path.
+    """The production index-embedding peptide path is bit-identical to
+    looking up fixed amino-acid vectors directly via ``amino_acid``.
 
-    This pins the fidelity of the index-encoding migration end-to-end — the
-    guarantee that loading and predicting saved models is numerically unchanged
-    — using the retained ``variable_length_to_fixed_length_vector_encoding`` and
-    the model's dense-input branch. (Replaces the old vector-vs-index forward
-    parity test, which built the two models through the now-coerced high-level
-    encoding flag.)
+    This pins the fidelity of the index-encoding path end-to-end against
+    ``amino_acid.fixed_vectors_encoding`` for every supported amino-acid
+    representation.
     """
     import torch
 
+    from mhcflurry import amino_acid
     from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
     from mhcflurry.encodable_sequences import EncodableSequences
-    from mhcflurry.amino_acid import vector_encoding_length
 
     align = dict(
         alignment_method="pad_middle", left_edge=4, right_edge=4, max_length=15)
-    width = vector_encoding_length(encoding_name)
-    arch = dict(
-        peptide_encoding_shape=(15, width), layer_sizes=[8],
-        activation="tanh", dropout_probability=0.0)
-
-    index_model = Class1NeuralNetworkModel(
-        peptide_input_is_indices=True,
-        peptide_input_vector_encoding_name=encoding_name, **arch).eval()
-    vector_model = Class1NeuralNetworkModel(
-        peptide_input_is_indices=False, **arch).eval()
-    # Identical downstream weights; only the peptide encoding (index-embed vs
-    # dense vector) differs.
-    vector_model.load_state_dict(index_model.state_dict(), strict=False)
+    width = amino_acid.vector_encoding_length(encoding_name)
+    model = Class1NeuralNetworkModel(
+        peptide_encoding_shape=(15, width),
+        layer_sizes=[8],
+        activation="tanh",
+        dropout_probability=0.0,
+        peptide_input_vector_encoding_name=encoding_name,
+    ).eval()
 
     peptides = random_peptides(16, length=9)
     encoder = EncodableSequences.create(peptides)
     index_input = encoder.variable_length_to_fixed_length_categorical(
         **align).astype("int8")
-    vector_input = encoder.variable_length_to_fixed_length_vector_encoding(
-        vector_encoding_name=encoding_name, **align).astype("float32")
+    dense_ref = amino_acid.fixed_vectors_encoding(
+        index_input,
+        amino_acid.get_vector_encoding_df(encoding_name),
+    ).astype("float32")
 
     with torch.no_grad():
-        index_out = index_model(
+        index_out = model(
             {"peptide": torch.from_numpy(index_input)}).numpy()
-        vector_out = vector_model(
-            {"peptide": torch.from_numpy(vector_input)}).numpy()
+        # Run the dense reference through the exact post-embedding layers.
+        x = torch.from_numpy(dense_ref).reshape(len(peptides), -1)
+        for layer in model.dense_layers:
+            x = model.activation(layer(x))
+        dense_out = model.output_activation(model.output_layer(x)).numpy()
 
     testing.assert_allclose(
-        index_out, vector_out, rtol=0, atol=1e-6,
-        err_msg="index-embedding peptide forward must equal the dense "
-                "vector-encoded forward for %s" % encoding_name)
+        index_out, dense_out, rtol=0, atol=1e-6,
+        err_msg="index-embedding peptide forward must equal dense "
+                "fixed_vectors_encoding reference for %s" % encoding_name)
 
 
 def test_unsupported_device_random_negative_alignment_falls_back_to_host():

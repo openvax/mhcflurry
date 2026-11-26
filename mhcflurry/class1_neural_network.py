@@ -14,7 +14,6 @@
 Class1NeuralNetwork - PyTorch implementation for MHC class I binding prediction.
 """
 
-import gc
 import time
 import collections
 import json
@@ -24,15 +23,14 @@ import os
 import logging
 
 import numpy
-import pandas
 import torch
 import torch.nn as nn
 
+from . import keras_model_config
 from . import pytorch_sizing
 from .hyperparameters import HyperparameterDefaults
 from .encodable_sequences import EncodableSequences, EncodingError
-from .allele_encoding import AlleleEncoding
-from .regression_target import to_ic50, from_ic50
+from .regression_target import to_ic50
 from .common import get_pytorch_device
 from .pytorch_layers import KerasBatchNorm1d, LocallyConnected1D, get_activation
 from .pytorch_losses import get_pytorch_loss
@@ -43,7 +41,6 @@ from .random_negative_peptides import (
     RandomNegativesPool,
     supports_device_random_negative_encoding,
 )
-from .class1_affinity_training_data import AffinityDeviceTrainingData
 from .class1_encoding import (
     _peptide_torch_encoding_name,
     _peptide_torch_encoding_shape,
@@ -52,31 +49,27 @@ from .class1_encoding import (
     peptide_sequences_to_network_input,
 )
 from .class1_training import (
+    EarlyStoppingState,
+    StreamingIteratorState,
     _StreamingBatchIterableDataset,
-    _batched_validation_loss,
-    _carry_forward_validation_loss,
-    _early_stop_reached,
     _make_streaming_batch_dataloader,
     _materialize_repeated_peptide_batch,
-    _move_fit_batch_to_device,
-    _should_validate_epoch,
-    _sync_mean_loss,
     _timing_enabled,
-    _timing_start,
-    _timing_stop,
-    torch_from_numpy,
-    _update_min_validation_loss,
     _validation_interval_from_hyperparameters,
-    validation_split_counts,
+    build_affinity_device_data,
+    compute_regularization_penalty,
+    prepare_affinity_inputs,
+    prepare_streaming_validation_tensors,
+    record_fit_summary,
+    run_affinity_training_epoch,
+    run_streaming_training_epoch,
+    seed_training_rngs,
 )
 from .pytorch_training import (
-    copy_module_state_dict_to_cpu,
     configure_matmul_precision,
-    effective_validation_batch_size,
     maybe_compile_loss,
     maybe_compile_network,
     uncompiled_network,
-    validation_forward_network,
 )
 
 
@@ -91,85 +84,6 @@ KERAS_BATCH_NORM_EPSILON = 1e-3
 # Keras uses moving = moving * 0.99 + batch * 0.01. PyTorch's momentum is the
 # new-batch coefficient, so the equivalent value is 0.01.
 KERAS_BATCH_NORM_MOMENTUM = 0.01
-
-
-def _run_training_batch(
-    *,
-    network,
-    optimizer,
-    loss_obj,
-    regularization_parameters,
-    l1_reg,
-    l2_reg,
-    inputs,
-    y_batch,
-    weights_batch=None,
-):
-    """Run one optimizer step and return the detached loss tensor."""
-    optimizer.zero_grad()
-    predictions = network(inputs)
-    loss = loss_obj(predictions, y_batch, sample_weights=weights_batch)
-    regularization_penalty = Class1NeuralNetwork._regularization_penalty(
-        regularization_parameters,
-        l1=l1_reg,
-        l2=l2_reg,
-    )
-    if regularization_penalty is not None:
-        loss = loss + regularization_penalty
-    loss.backward()
-    optimizer.step()
-    return loss.detach()
-
-
-def _run_prepared_training_batches(
-    prepared_batches,
-    *,
-    optimizer,
-    loss_obj,
-    regularization_parameters,
-    l1_reg,
-    l2_reg,
-    timing_enabled,
-    device,
-):
-    """Run optimizer steps for a prepared batch stream.
-
-    Batch sources are responsible for efficient data plumbing. The in-memory
-    affinity path yields device-resident tensors selected by GPU indices; the
-    streaming pretrain path yields DataLoader chunks after its H2D copy. This
-    helper owns the learning step so fit() and fit_streaming_batches() share the
-    same optimizer/loss/timing behavior without forcing one data layout onto the
-    other.
-    """
-    losses = []
-    train_time = 0.0
-    train_rows = 0
-    first_batch_time = None
-    for prepared in prepared_batches:
-        batch_start = _timing_start(device, timing_enabled)
-        loss = _run_training_batch(
-            network=prepared["network"],
-            optimizer=optimizer,
-            loss_obj=loss_obj,
-            regularization_parameters=regularization_parameters,
-            l1_reg=l1_reg,
-            l2_reg=l2_reg,
-            inputs=prepared["inputs"],
-            y_batch=prepared["y_batch"],
-            weights_batch=prepared.get("weights_batch"),
-        )
-        batch_time = _timing_stop(batch_start, device, timing_enabled)
-        train_time += batch_time
-        if first_batch_time is None:
-            first_batch_time = batch_time
-        train_rows += int(prepared["row_count"])
-        losses.append(loss)
-    return {
-        "losses": losses,
-        "train_time": train_time,
-        "train_rows": train_rows,
-        "first_batch_time": first_batch_time,
-    }
 
 
 class Class1NeuralNetworkModel(nn.Module):
@@ -196,37 +110,26 @@ class Class1NeuralNetworkModel(nn.Module):
             topology="feedforward",
             num_outputs=1,
             init="glorot_uniform",
-            peptide_input_is_indices=False,
-            peptide_input_vector_encoding_name=None,
+            peptide_input_vector_encoding_name="BLOSUM62",
             normalization="none"):
         super(Class1NeuralNetworkModel, self).__init__()
 
         self.peptide_encoding_shape = peptide_encoding_shape
-        if peptide_input_vector_encoding_name is None and peptide_input_is_indices:
+        if peptide_input_vector_encoding_name is None:
             peptide_input_vector_encoding_name = "BLOSUM62"
         self.peptide_input_vector_encoding_name = peptide_input_vector_encoding_name
-        self.peptide_input_is_indices = peptide_input_vector_encoding_name is not None
-        # DEPRECATED (scheduled for removal): ``peptide_input_is_indices`` is now
-        # always True in production — the encoding path emits (N, L) int8 and the
-        # legacy dense-vector peptide path is gone. The ``False`` branch (a 3D
-        # fp32 peptide input, handled in ``forward``/``predict``) is retained
-        # only as defensive handling used by topology/init unit tests; it has no
-        # production caller and should be collapsed to index-only when those
-        # tests migrate.
-        #
-        # Device-side fixed amino-acid encoding: when enabled, peptide input
-        # is (N, L) int indices and ``forward`` widens to (N, L, V) fp32 via
-        # a frozen embedding table. The table is a non-persistent buffer: it
-        # moves with ``.to(device)`` but is fully determined by hyperparameters
-        # and should not be serialized in custom NPZ weight lists.
-        if self.peptide_input_is_indices:
-            self.register_buffer(
-                "peptide_embedding_table",
-                torch.from_numpy(
-                    _peptide_torch_encoding_table(peptide_input_vector_encoding_name)
-                ),
-                persistent=False,
-            )
+        # Device-side fixed amino-acid encoding: peptide input is (N, L) int
+        # indices and ``forward`` widens to (N, L, V) fp32 via a frozen
+        # embedding table. The table is a non-persistent buffer: it moves with
+        # ``.to(device)`` but is fully determined by hyperparameters and is not
+        # serialized in custom NPZ weight lists.
+        self.register_buffer(
+            "peptide_embedding_table",
+            torch.from_numpy(
+                _peptide_torch_encoding_table(peptide_input_vector_encoding_name)
+            ),
+            persistent=False,
+        )
         self.has_allele = allele_representations is not None
         self.peptide_allele_merge_method = peptide_allele_merge_method
         self.peptide_allele_merge_activation = peptide_allele_merge_activation
@@ -450,15 +353,18 @@ class Class1NeuralNetworkModel(nn.Module):
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
 
-    def _forward_peptide_stage_before_early_batch_norm(self, peptide):
-        if (
-            self.peptide_input_is_indices
-            and peptide.dim() == 2
-        ):
-            peptide = torch.nn.functional.embedding(
-                peptide.long(), self.peptide_embedding_table
+    def _embed_peptide_indices(self, peptide):
+        if peptide.dim() != 2:
+            raise ValueError(
+                "Expected 2D index-encoded peptide tensor (N, L); got shape %s"
+                % (tuple(peptide.shape),)
             )
-        x = peptide
+        return torch.nn.functional.embedding(
+            peptide.long(), self.peptide_embedding_table
+        )
+
+    def _forward_peptide_stage_before_early_batch_norm(self, peptide):
+        x = self._embed_peptide_indices(peptide)
         for lc_layer in self.lc_layers:
             x = lc_layer(x)
         x = x.reshape(x.size(0), -1)
@@ -479,8 +385,7 @@ class Class1NeuralNetworkModel(nn.Module):
         Parameters
         ----------
         peptide : torch.Tensor
-            (N, L, V) fp32 fixed-vector encoded, or (N, L) int indices when
-            ``peptide_input_is_indices`` is True.
+            ``(N, L)`` int amino-acid indices.
 
         Returns
         -------
@@ -868,18 +773,11 @@ class Class1NeuralNetworkModel(nn.Module):
                 int(peptide_repeat_count),
             )
 
-        # Device-side fixed amino-acid encoding: (N, L) int indices →
-        # (N, L, V) fp32. Skipped when the input is already the 3D
-        # vector-encoded tensor. ``torch.nn.functional.embedding`` is a
-        # pure gather, so the op cost is comparable to the int8→fp32
-        # widening cast it replaces while saving V× H2D/cache bytes.
-        if self.peptide_input_is_indices and peptide.dim() == 2:
-            peptide = torch.nn.functional.embedding(
-                peptide.long(), self.peptide_embedding_table
-            )
+        # Device-side fixed amino-acid encoding: (N, L) int indices ->
+        # (N, L, V) fp32 via frozen embedding table.
+        x = self._embed_peptide_indices(peptide)
 
         # Locally connected layers
-        x = peptide
         for lc_layer in self.lc_layers:
             x = lc_layer(x)
 
@@ -1005,266 +903,56 @@ class Class1NeuralNetworkModel(nn.Module):
         auto_convert_keras : bool
             If True, automatically detect and convert Keras-format weights
         """
-        if auto_convert_keras and getattr(self, "_keras_config", None):
-            keras_layers = self._keras_config.get("config", {}).get("layers", [])
-            idx = 0
-
-            def assign_dense(layer, w, b):
-                w = w.astype(numpy.float32)
-                b = b.astype(numpy.float32)
-                if w.shape == layer.weight.shape[::-1] or (
-                    w.shape == layer.weight.shape and w.shape[0] == w.shape[1]
-                ):
-                    w = w.T
-                if w.shape != layer.weight.shape:
-                    raise ValueError(
-                        f"Weight shape mismatch for {layer}: got {w.shape}, "
-                        f"expected {layer.weight.shape}"
-                    )
-                if b.shape != layer.bias.shape:
-                    raise ValueError(
-                        f"Bias shape mismatch for {layer}: got {b.shape}, "
-                        f"expected {layer.bias.shape}"
-                    )
-                layer.weight.data = torch.from_numpy(w).to(
-                    device=layer.weight.device,
-                    dtype=layer.weight.dtype,
-                )
-                layer.bias.data = torch.from_numpy(b).to(
-                    device=layer.bias.device,
-                    dtype=layer.bias.dtype,
-                )
-
-            def assign_locally_connected(layer, w, b):
-                w = w.astype(numpy.float32)
-                b = b.astype(numpy.float32)
-                if len(w.shape) == 5 and w.shape[1] == 1:
-                    out_len, _, k, in_ch, out_ch = w.shape
-                    w = w.squeeze(1)
-                    w = w.reshape(out_len, k * in_ch, out_ch)
-                    w = w.transpose(0, 2, 1)
-                elif len(w.shape) == 3 and w.shape[0] == layer.output_length:
-                    # Keras (out_len, k*in_ch, out_ch) -> PyTorch (out_len, out_ch, in_ch*k)
-                    if w.shape[1] == layer.weight.shape[2] and w.shape[2] == layer.weight.shape[1]:
-                        w = w.transpose(0, 2, 1)
-                    else:
-                        kernel_size = layer.kernel_size
-                        out_len = w.shape[0]
-                        k_times_in_ch = w.shape[1]
-                        out_ch = w.shape[2]
-                        in_ch = k_times_in_ch // kernel_size
-                        w = w.reshape(out_len, kernel_size, in_ch, out_ch)
-                        w = w.transpose(0, 2, 1, 3)
-                        w = w.reshape(out_len, in_ch * kernel_size, out_ch)
-                        w = w.transpose(0, 2, 1)
-                if w.shape != layer.weight.shape:
-                    raise ValueError(
-                        f"Weight shape mismatch for {layer}: got {w.shape}, "
-                        f"expected {layer.weight.shape}"
-                    )
-                if b.shape != layer.bias.shape:
-                    raise ValueError(
-                        f"Bias shape mismatch for {layer}: got {b.shape}, "
-                        f"expected {layer.bias.shape}"
-                    )
-                layer.weight.data = torch.from_numpy(w).to(
-                    device=layer.weight.device,
-                    dtype=layer.weight.dtype,
-                )
-                layer.bias.data = torch.from_numpy(b).to(
-                    device=layer.bias.device,
-                    dtype=layer.bias.dtype,
-                )
-
-            def assign_batch_norm(layer, gamma, beta, mean, var):
-                layer.weight.data = torch.from_numpy(
-                    gamma.astype(numpy.float32)
-                ).to(device=layer.weight.device, dtype=layer.weight.dtype)
-                layer.bias.data = torch.from_numpy(
-                    beta.astype(numpy.float32)
-                ).to(device=layer.bias.device, dtype=layer.bias.dtype)
-                layer.running_mean.data = torch.from_numpy(
-                    mean.astype(numpy.float32)
-                ).to(
-                    device=layer.running_mean.device,
-                    dtype=layer.running_mean.dtype,
-                )
-                layer.running_var.data = torch.from_numpy(
-                    var.astype(numpy.float32)
-                ).to(
-                    device=layer.running_var.device,
-                    dtype=layer.running_var.dtype,
-                )
-
-            skip_keras_embedding = False
-            keras_metadata = getattr(self, "_keras_metadata", None)
-            if keras_metadata and keras_metadata.get("skip_embedding_weights", False):
-                skip_keras_embedding = True
-
-            for layer in keras_layers:
-                layer_class = layer.get("class_name", "")
-                layer_name = layer.get("config", {}).get("name", "")
-
-                if layer_class == "Dense":
-                    w = weights[idx]
-                    b = weights[idx + 1]
-                    idx += 2
-                    if layer_name == "output":
-                        assign_dense(self.output_layer, w, b)
-                    elif layer_name.startswith("dense_"):
-                        dense_idx = int(layer_name.split("_")[1])
-                        assign_dense(self.dense_layers[dense_idx], w, b)
-                    elif layer_name.startswith("peptide_dense_"):
-                        dense_idx = int(layer_name.split("_")[2])
-                        assign_dense(self.peptide_dense_layers[dense_idx], w, b)
-                    elif layer_name.startswith("allele_dense_"):
-                        dense_idx = int(layer_name.split("_")[2])
-                        assign_dense(self.allele_dense_layers[dense_idx], w, b)
-                elif layer_class == "LocallyConnected1D":
-                    w = weights[idx]
-                    b = weights[idx + 1]
-                    idx += 2
-                    lc_idx = int(layer_name.split("_")[1])
-                    assign_locally_connected(self.lc_layers[lc_idx], w, b)
-                elif layer_class == "Embedding":
-                    w = weights[idx]
-                    idx += 1
-                    if skip_keras_embedding:
-                        continue
-                    if self.allele_embedding is None:
-                        continue
-                    if w.shape == self.allele_embedding.weight.shape:
-                        target = self.allele_embedding.weight
-                        self.allele_embedding.weight.data = torch.from_numpy(
-                            w.astype(numpy.float32)
-                        ).to(device=target.device, dtype=target.dtype)
-                elif layer_class == "BatchNormalization":
-                    gamma = weights[idx]
-                    beta = weights[idx + 1]
-                    mean = weights[idx + 2]
-                    var = weights[idx + 3]
-                    idx += 4
-                    if layer_name == "batch_norm_early":
-                        if self.batch_norm_early is not None:
-                            assign_batch_norm(self.batch_norm_early, gamma, beta, mean, var)
-                    elif layer_name.startswith("batch_norm_"):
-                        bn_idx = int(layer_name.split("_")[2])
-                        if self.batch_norms[bn_idx] is not None:
-                            assign_batch_norm(self.batch_norms[bn_idx], gamma, beta, mean, var)
-                else:
-                    continue
-
+        if auto_convert_keras:
+            keras_model_config.load_keras_weights_into_model(
+                self,
+                weights,
+                keras_config=getattr(self, "_keras_config", None),
+                keras_metadata=getattr(self, "_keras_metadata", None),
+            )
             return
+
         idx = 0
-
-        # Check for keras metadata to know if we need to skip embedding weights
-        keras_metadata = getattr(self, '_keras_metadata', None)
-        skip_keras_embedding = False
-        if keras_metadata and keras_metadata.get('skip_embedding_weights', False):
-            skip_keras_embedding = True
-
-        named_modules = dict(self.named_modules()) if auto_convert_keras else {}
-
+        keras_metadata = getattr(self, "_keras_metadata", None)
+        skip_keras_embedding = bool(
+            keras_metadata and keras_metadata.get("skip_embedding_weights", False)
+        )
         for name, param in self.named_parameters():
-            # Skip allele_embedding when loading Keras weights with placeholder
-            if skip_keras_embedding and 'allele_embedding' in name:
-                # Also skip the corresponding placeholder weight in the weights list
-                # Placeholder embeddings have shape (0, embed_dim)
-                while idx < len(weights) and len(weights[idx].shape) == 2 and weights[idx].shape[0] == 0:
+            if skip_keras_embedding and "allele_embedding" in name:
+                while (
+                    idx < len(weights)
+                    and len(weights[idx].shape) == 2
+                    and weights[idx].shape[0] == 0
+                ):
                     idx += 1
                 continue
             w = weights[idx].astype(numpy.float32)
-            extra_keras_skip = 0
-            module = None
-            if auto_convert_keras and "." in name:
-                module_name = name.rsplit(".", 1)[0]
-                module = named_modules.get(module_name)
-
-            # Skip allele_embedding if shapes don't match (pan-allele models)
-            # The embedding will be set by set_allele_representations later
-            if 'allele_embedding' in name and w.shape != param.shape:
-                # Advance index past this weight
+            if "allele_embedding" in name and w.shape != param.shape:
                 idx += 1
                 continue
-
-            # Auto-detect and convert Keras weights
-            if auto_convert_keras:
-                # Dense/Linear layer: Keras (in, out) -> PyTorch (out, in)
-                # Note: Must transpose even when shapes match (square matrices)
-                # Check for weight (not bias) by looking at param name
-                is_linear_weight = ('weight' in name and
-                                    'embedding' not in name and
-                                    len(w.shape) == 2)
-                if is_linear_weight and (w.shape == param.shape[::-1] or
-                        (w.shape == param.shape and w.shape[0] == w.shape[1])):
-                    w = w.T
-                # LocallyConnected1D weight: Keras (out_len, 1, k, in_ch, out_ch)
-                # -> PyTorch (out_len, out_ch, in_ch * k)
-                elif len(w.shape) == 5 and w.shape[1] == 1:
-                    out_len, _, k, in_ch, out_ch = w.shape
-                    w = w.squeeze(1)  # (out_len, k, in_ch, out_ch)
-                    w = w.reshape(out_len, k * in_ch, out_ch)
-                    w = w.transpose(0, 2, 1)  # (out_len, out_ch, k * in_ch)
-                # LocallyConnected1D weight (3D): Keras (out_len, k*in_ch, out_ch)
-                # -> PyTorch (out_len, out_ch, in_ch*k)
-                # Note: Keras stores kernel_positions as outer loop, channels as inner
-                # PyTorch unfold produces channels as outer loop, kernel_positions as inner
-                elif len(w.shape) == 3 and w.shape[0] == param.shape[0] and \
-                        w.shape[1] == param.shape[2] and w.shape[2] == param.shape[1]:
-                    # LocallyConnected1D weight (3D): Keras (out_len, k*in_ch, out_ch)
-                    # -> PyTorch (out_len, out_ch, k*in_ch)
-                    w = w.transpose(0, 2, 1)
-                # LocallyConnected1D bias: Keras (out_len * out_ch,) -> PyTorch (out_len, out_ch)
-                elif len(w.shape) == 1 and len(param.shape) == 2 and \
-                        w.shape[0] == param.shape[0] * param.shape[1]:
-                    w = w.reshape(param.shape)
-                # BatchNorm: Keras provides gamma, beta, moving_mean, moving_var.
-                # PyTorch exposes gamma/beta as params and moving stats as buffers.
-                if module is not None and isinstance(module, torch.nn.BatchNorm1d):
-                    if name.endswith("bias") and idx + 2 < len(weights):
-                        running_mean = weights[idx + 1].astype(numpy.float32)
-                        running_var = weights[idx + 2].astype(numpy.float32)
-                        if module.running_mean.shape == running_mean.shape:
-                            module.running_mean.data = torch.from_numpy(
-                                running_mean
-                            ).to(
-                                device=module.running_mean.device,
-                                dtype=module.running_mean.dtype,
-                            )
-                        if module.running_var.shape == running_var.shape:
-                            module.running_var.data = torch.from_numpy(
-                                running_var
-                            ).to(
-                                device=module.running_var.device,
-                                dtype=module.running_var.dtype,
-                            )
-                        extra_keras_skip = 2
-
             if w.shape != param.shape:
                 raise ValueError(
                     f"Weight shape mismatch for {name}: "
                     f"got {weights[idx].shape}, expected {param.shape}"
                 )
-
             param.data = torch.from_numpy(w).to(
                 device=param.device,
                 dtype=param.dtype,
             )
-            idx += 1 + extra_keras_skip
-        if not auto_convert_keras:
-            named_modules_dict = dict(self.named_modules())
-            for name, buffer in self._named_persistent_buffers():
-                tensor = torch.from_numpy(weights[idx]).to(
-                    device=buffer.device,
-                    dtype=buffer.dtype,
-                )
-                # Navigate to the correct submodule for nested buffers
-                if "." in name:
-                    module_path, buffer_name = name.rsplit(".", 1)
-                    named_modules_dict[module_path]._buffers[buffer_name] = tensor
-                else:
-                    self._buffers[name] = tensor
-                idx += 1
+            idx += 1
+
+        named_modules_dict = dict(self.named_modules())
+        for name, buffer in self._named_persistent_buffers():
+            tensor = torch.from_numpy(weights[idx]).to(
+                device=buffer.device,
+                dtype=buffer.dtype,
+            )
+            if "." in name:
+                module_path, buffer_name = name.rsplit(".", 1)
+                named_modules_dict[module_path]._buffers[buffer_name] = tensor
+            else:
+                self._buffers[name] = tensor
+            idx += 1
 
     def to_json(self):
         """
@@ -1562,12 +1250,10 @@ class Class1NeuralNetwork(object):
         """
         assert network_weights is not None
         config = json.loads(network_json)
-        # Detect if weights are from Keras or PyTorch format
-        # Keras JSON has 'class_name': 'Model' or 'Functional'; PyTorch has 'hyperparameters'
-        is_keras_format = config.get('class_name') in ('Model', 'Functional')
+        is_keras_format = keras_model_config.is_keras_model_config(config)
         key = (
             klass.model_cache_key(network_json),
-            klass._infer_allele_representation_dim_from_weights(
+            keras_model_config.infer_allele_representation_dim_from_weights(
                 network_weights,
                 config.get("hyperparameters", {}),
                 network_config=config,
@@ -1593,481 +1279,54 @@ class Class1NeuralNetwork(object):
 
     @classmethod
     def _parse_keras_json_config(cls, config):
-        """
-        Parse a legacy Keras model JSON config to extract hyperparameters.
-
-        Parameters
-        ----------
-        config : dict
-            Keras model JSON config with 'class_name', 'config', etc.
-
-        Returns
-        -------
-        tuple of (dict, dict)
-            First dict: Hyperparameters dict compatible with Class1NeuralNetwork
-            Second dict: Metadata about Keras model structure (e.g., embedding info)
-        """
-        layers = config.get('config', {}).get('layers', [])
-
-        hyperparameters = {
-            'locally_connected_layers': [],
-            'layer_sizes': [],
-            'activation': 'tanh',
-            'output_activation': 'sigmoid',
-            'dropout_probability': 0.0,
-            'batch_normalization': False,
-            'dense_layer_l1_regularization': 0.001,
-            'dense_layer_l2_regularization': 0.0,
-            'peptide_allele_merge_method': 'multiply',  # Default
-        }
-
-        # Metadata about Keras structure
-        keras_metadata = {
-            'has_embedding': False,
-            'embedding_input_dim': 0,
-            'embedding_output_dim': 0,
-            'skip_embedding_weights': False,
-        }
-
-        dense_layers = []
-        peptide_dense_sizes = []
-        allele_dense_sizes = []
-        concatenate_count = 0
-        for layer in layers:
-            layer_class = layer.get('class_name', '')
-            layer_config = layer.get('config', {})
-
-            if layer_class == 'LocallyConnected1D':
-                lc_config = {
-                    'filters': layer_config.get('filters', 8),
-                    'kernel_size': layer_config.get('kernel_size', [3])[0] if isinstance(
-                        layer_config.get('kernel_size', [3]), list
-                    ) else layer_config.get('kernel_size', 3),
-                    'activation': layer_config.get('activation', 'tanh'),
-                }
-                hyperparameters['locally_connected_layers'].append(lc_config)
-                hyperparameters['activation'] = lc_config['activation']
-
-            elif layer_class == 'Dense':
-                units = layer_config.get('units', 32)
-                activation = layer_config.get('activation', 'tanh')
-                layer_name = layer_config.get('name', '')
-                if layer_name.startswith('peptide_dense_'):
-                    peptide_dense_sizes.append(units)
-                elif layer_name.startswith('allele_dense_'):
-                    allele_dense_sizes.append(units)
-                else:
-                    dense_layers.append({'units': units, 'activation': activation})
-
-                # Extract regularization from first dense layer
-                kernel_reg = layer_config.get('kernel_regularizer')
-                if kernel_reg and isinstance(kernel_reg, dict):
-                    reg_config = kernel_reg.get('config', {})
-                    if 'l1' in reg_config:
-                        hyperparameters['dense_layer_l1_regularization'] = reg_config['l1']
-                    if 'l2' in reg_config:
-                        hyperparameters['dense_layer_l2_regularization'] = reg_config['l2']
-
-            elif layer_class == 'Dropout':
-                rate = layer_config.get('rate', 0.0)
-                hyperparameters['dropout_probability'] = 1.0 - rate
-
-            elif layer_class == 'BatchNormalization':
-                hyperparameters['batch_normalization'] = True
-
-            elif layer_class == 'LayerNormalization':
-                hyperparameters['normalization'] = 'layer'
-
-            elif layer_class == 'Embedding':
-                keras_metadata['has_embedding'] = True
-                keras_metadata['embedding_input_dim'] = layer_config.get('input_dim', 0)
-                keras_metadata['embedding_output_dim'] = layer_config.get('output_dim', 0)
-                # If input_dim is 0, it's a placeholder and weights should be skipped
-                if layer_config.get('input_dim', 0) == 0:
-                    keras_metadata['skip_embedding_weights'] = True
-
-            elif layer_class == 'Concatenate':
-                concatenate_count += 1
-                # Only set merge_method to concatenate if there's just one Concatenate
-                # and it's likely for peptide-allele merging (not DenseNet skip connections)
-                if concatenate_count == 1:
-                    hyperparameters['peptide_allele_merge_method'] = 'concatenate'
-
-            elif layer_class == 'Multiply':
-                hyperparameters['peptide_allele_merge_method'] = 'multiply'
-
-        # Multiple Concatenate layers indicate DenseNet topology with skip connections
-        # Note: The first Concatenate is typically for peptide-allele merging,
-        # subsequent ones are for DenseNet skip connections
-        if concatenate_count > 1:
-            hyperparameters['topology'] = 'with-skip-connections'
-            # Keep the merge method as detected (concatenate from first Concatenate layer)
-
-        # The last Dense layer is the output layer
-        if dense_layers:
-            hyperparameters['output_activation'] = dense_layers[-1]['activation']
-            hyperparameters['num_outputs'] = dense_layers[-1]['units']
-            # All other Dense layers contribute to layer_sizes
-            hyperparameters['layer_sizes'] = [d['units'] for d in dense_layers[:-1]]
-            if dense_layers[:-1]:
-                hyperparameters['activation'] = dense_layers[0]['activation']
-
-        if peptide_dense_sizes:
-            hyperparameters['peptide_dense_layer_sizes'] = peptide_dense_sizes
-        if allele_dense_sizes:
-            hyperparameters['allele_dense_layer_sizes'] = allele_dense_sizes
-
-        return hyperparameters, keras_metadata
+        """Parse a legacy Keras model JSON config (see ``keras_model_config``)."""
+        return keras_model_config.parse_keras_json_config(config)
 
     @classmethod
     def _infer_allele_representation_dim_from_weights(
             cls, network_weights, hyperparameters, network_config=None):
-        """Infer flattened allele representation width from serialized weights.
-
-        Strategy:
-          1. Compute the position of the first allele-stage weight from
-             the architecture config. In ``named_parameters()`` order the
-             layout is::
-
-                locally_connected → peptide_dense → batch_norm_early?
-                  → allele_dense → allele_embedding → dense_layers
-                  → output
-
-             so ``weights[peptide_offset]`` is the first allele_dense
-             weight (when allele_dense layers exist) or the
-             allele_embedding weight (otherwise). Either way its
-             ``shape[1]`` equals the flattened allele representation
-             width.
-
-          2. Cross-check using a structural invariant: when allele_dense
-             layers exist, both the allele_dense first-layer weight and
-             the allele_embedding weight have ``shape[1]`` equal to
-             ``allele_rep_width``. That value appears at two distinct
-             positions in the weight list. Peptide-stage Linear weights
-             chain through different shape[1] values, so no peptide
-             weight will produce a duplicate match.
-
-          3. Return ``None`` if neither check is conclusive. The caller
-             falls back to ``default_sequence_length`` (39).
-        """
-        if not network_weights or not hyperparameters.get('allele_amino_acid_encoding'):
-            return None
-        from .amino_acid import get_vector_encoding_df
-        try:
-            encoding_dim = len(get_vector_encoding_df(
-                hyperparameters['allele_amino_acid_encoding']).columns)
-        except KeyError:
-            return None
-
-        if network_config and network_config.get("merged_networks"):
-            architecture = network_config["merged_networks"][0]
-        elif network_config:
-            architecture = network_config.get("hyperparameters", network_config)
-        else:
-            architecture = hyperparameters
-
-        def valid_dim(dim):
-            if dim % encoding_dim != 0:
-                return False
-            sequence_length = dim // encoding_dim
-            return 20 <= sequence_length <= 60
-
-        def candidate_dim(weight):
-            if isinstance(weight, numpy.ndarray) and len(weight.shape) == 2:
-                dim = weight.shape[1]
-                if valid_dim(dim):
-                    return dim
-            return None
-
-        allele_dense_sizes = architecture.get(
-            'allele_dense_layer_sizes',
-            hyperparameters.get('allele_dense_layer_sizes', []),
+        """Infer flattened allele representation width (see ``keras_model_config``)."""
+        return keras_model_config.infer_allele_representation_dim_from_weights(
+            network_weights, hyperparameters, network_config=network_config
         )
-
-        peptide_offset = 0
-        peptide_offset += 2 * len(architecture.get(
-            'locally_connected_layers',
-            hyperparameters.get('locally_connected_layers', []),
-        ))
-        peptide_offset += 2 * len(architecture.get(
-            'peptide_dense_layer_sizes',
-            hyperparameters.get('peptide_dense_layer_sizes', []),
-        ))
-        if architecture.get(
-                'batch_normalization',
-                hyperparameters.get('batch_normalization', False)) or (
-                architecture.get(
-                    'normalization',
-                    hyperparameters.get('normalization', 'none'),
-                ) in ('batch', 'layer')):
-            peptide_offset += 2
-
-        n = len(network_weights)
-
-        # Position-based primary lookup.
-        primary_dim = (
-            candidate_dim(network_weights[peptide_offset])
-            if peptide_offset < n else None)
-
-        # Cross-check: when allele_dense layers exist, the same shape[1]
-        # must appear at the embedding position (peptide_offset +
-        # 2*n_allele_dense_layers). If they disagree, the offset is
-        # wrong and we fall back to a duplicate-shape scan.
-        if primary_dim is not None and allele_dense_sizes:
-            embedding_idx = (
-                peptide_offset + 2 * len(allele_dense_sizes))
-            if embedding_idx < n:
-                embedding_dim = candidate_dim(network_weights[embedding_idx])
-                if embedding_dim == primary_dim:
-                    return primary_dim
-                # Disagreement: don't trust either value here, scan below.
-            else:
-                # Can't confirm via embedding slot; trust the primary.
-                return primary_dim
-        elif primary_dim is not None:
-            # No allele_dense — only one matching slot exists.
-            return primary_dim
-
-        # Fallback: duplicate-shape[1] scan. Only the allele block
-        # (allele_dense weight + allele_embedding weight) produces two
-        # 2D weights with the same shape[1] in this architecture.
-        if allele_dense_sizes:
-            seen = {}
-            for i in range(n):
-                dim = candidate_dim(network_weights[i])
-                if dim is None:
-                    continue
-                if dim in seen:
-                    logging.warning(
-                        "Allele width inferred via duplicate-shape fallback "
-                        "(positions %d and %d -> width %d). Position-based "
-                        "lookup failed: the saved layer count may not match "
-                        "the architecture used to write these weights.",
-                        seen[dim],
-                        i,
-                        dim,
-                    )
-                    return dim
-                seen[dim] = i
-        return None
 
     @classmethod
     def _placeholder_allele_representations(
             cls, hyperparameters, network_weights=None, network_config=None,
             default_sequence_length=39):
-        """Create a shape-compatible placeholder for pan-allele models.
-
-        Public artifacts have used several pseudosequence widths over time
-        (including 2.1.x-era weights). Prefer the width encoded in the saved
-        weights; fall back to the current 39-residue sequence only when no
-        weights are available to guide reconstruction.
-        """
-        if not hyperparameters.get('allele_amino_acid_encoding'):
-            return None
-        from .amino_acid import get_vector_encoding_df
-        encoding_name = hyperparameters['allele_amino_acid_encoding']
-        try:
-            encoding_df = get_vector_encoding_df(encoding_name)
-        except KeyError:
-            return None
-        embedding_dim = cls._infer_allele_representation_dim_from_weights(
-            network_weights,
+        """Create a shape-compatible placeholder allele array (see ``keras_model_config``)."""
+        return keras_model_config.placeholder_allele_representations(
             hyperparameters,
+            network_weights=network_weights,
             network_config=network_config,
+            default_sequence_length=default_sequence_length,
         )
-        if embedding_dim is None:
-            embedding_dim = default_sequence_length * len(encoding_df.columns)
-        return numpy.zeros((1, embedding_dim), dtype=numpy.float32)
 
     @classmethod
     def _create_model_from_config(
             cls, config, instance_hyperparameters=None, network_weights=None):
-        """Create a model from a configuration dictionary.
-
-        Parameters
-        ----------
-        config : dict
-            Configuration dictionary (either Keras JSON or hyperparameters dict)
-        instance_hyperparameters : dict, optional
-            Hyperparameters from the Class1NeuralNetwork instance.
-            These take precedence for things like peptide_encoding.
-        network_weights : list of numpy.ndarray, optional
-            Saved weights used to infer the placeholder allele representation.
-        """
-        keras_metadata = None
-
-        # Check if this is a merged network config
-        if config.get('merged_networks'):
-            return cls._create_merged_model_from_config(
-                config,
-                instance_hyperparameters,
-                network_weights=network_weights,
-            )
-
-        # Check if this is a legacy Keras JSON config
-        if config.get('class_name') in ('Model', 'Functional'):
-            hyperparameters, keras_metadata = cls._parse_keras_json_config(config)
-        else:
-            # Extract hyperparameters from config (new format)
-            hyperparameters = config.get('hyperparameters', config)
-
-        # Merge with instance hyperparameters if provided
-        # Instance hyperparameters take precedence for things like peptide_encoding
-        if instance_hyperparameters:
-            # Copy to avoid modifying original
-            merged = dict(instance_hyperparameters)
-            # Update with parsed hyperparameters (architecture-specific settings)
-            for key in ['layer_sizes', 'locally_connected_layers', 'dropout_probability',
-                        'batch_normalization', 'normalization', 'activation',
-                        'output_activation',
-                        'peptide_allele_merge_method']:
-                if key in hyperparameters:
-                    merged[key] = hyperparameters[key]
-            hyperparameters = merged
-
-        hyperparameters = cls.hyperparameter_defaults.with_defaults(
-            cls.apply_hyperparameter_renames(dict(hyperparameters))
+        """Create a model from a config dict (see ``keras_model_config``)."""
+        return keras_model_config.create_model_from_config(
+            config,
+            model_cls=Class1NeuralNetworkModel,
+            merged_model_cls=MergedClass1NeuralNetwork,
+            network_cls=cls,
+            instance_hyperparameters=instance_hyperparameters,
+            network_weights=network_weights,
         )
-
-        # Create a temporary instance to get encoding shape
-        temp = cls(**hyperparameters)
-        peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
-        peptide_torch_encoding_name = _peptide_torch_encoding_name(hyperparameters)
-        # Device-side fixed encoding: peptides_to_network_input returns
-        # (N, L) int indices, but dense layers are still sized against
-        # the post-embedding (L, V) shape.
-        if peptide_torch_encoding_name and len(peptide_encoding_shape) == 1:
-            peptide_encoding_shape = _peptide_torch_encoding_shape(
-                peptide_encoding_shape,
-                peptide_torch_encoding_name,
-            )
-
-        # Get allele representations if present
-        allele_representations = config.get('allele_representations')
-        if allele_representations is not None:
-            allele_representations = numpy.array(allele_representations)
-
-        # For pan-allele Keras models with placeholder embedding (input_dim=0),
-        # create a placeholder allele representation to ensure correct architecture
-        if (allele_representations is None and keras_metadata is not None
-                and keras_metadata.get('has_embedding', False)
-                and keras_metadata.get('embedding_output_dim', 0) > 0):
-            # Create placeholder with 1 allele and correct embedding dim
-            # This will be replaced by set_allele_representations later
-            embedding_dim = keras_metadata['embedding_output_dim']
-            allele_representations = numpy.zeros((1, embedding_dim), dtype=numpy.float32)
-
-        # For PyTorch-format configs without allele_representations but with
-        # allele_amino_acid_encoding (pan-allele models), create placeholder
-        # Check has_allele flag to distinguish pan-allele from allele-specific models
-        has_allele = config.get('has_allele', True)  # Default True for backward compat
-        if (allele_representations is None and keras_metadata is None
-                and has_allele and hyperparameters.get('allele_amino_acid_encoding')):
-            allele_representations = cls._placeholder_allele_representations(
-                hyperparameters,
-                network_weights=network_weights,
-                network_config=config,
-            )
-
-        model = Class1NeuralNetworkModel(
-            peptide_encoding_shape=peptide_encoding_shape,
-            allele_representations=allele_representations,
-            locally_connected_layers=hyperparameters.get('locally_connected_layers', []),
-            peptide_dense_layer_sizes=hyperparameters.get('peptide_dense_layer_sizes', []),
-            allele_dense_layer_sizes=hyperparameters.get('allele_dense_layer_sizes', []),
-            layer_sizes=hyperparameters.get('layer_sizes', [32]),
-            peptide_allele_merge_method=hyperparameters.get('peptide_allele_merge_method', 'multiply'),
-            peptide_allele_merge_activation=hyperparameters.get('peptide_allele_merge_activation', ''),
-            activation=hyperparameters.get('activation', 'tanh'),
-            output_activation=hyperparameters.get('output_activation', 'sigmoid'),
-            dropout_probability=hyperparameters.get('dropout_probability', 0.0),
-            batch_normalization=hyperparameters.get('batch_normalization', False),
-            normalization=hyperparameters.get('normalization', 'none'),
-            dense_layer_l1_regularization=hyperparameters.get('dense_layer_l1_regularization', 0.001),
-            dense_layer_l2_regularization=hyperparameters.get('dense_layer_l2_regularization', 0.0),
-            topology=hyperparameters.get('topology', 'feedforward'),
-            num_outputs=hyperparameters.get('num_outputs', 1),
-            init=hyperparameters.get('init', 'glorot_uniform'),
-            peptide_input_vector_encoding_name=peptide_torch_encoding_name,
-        )
-
-        # Store keras metadata and config for weight loading
-        if keras_metadata is not None:
-            model._keras_metadata = keras_metadata
-            model._keras_config = config
-
-        return model
 
     @classmethod
     def _create_merged_model_from_config(
             cls, config, instance_hyperparameters=None, network_weights=None):
-        """Create a merged model from a configuration dictionary.
-
-        Parameters
-        ----------
-        config : dict
-            Configuration dictionary with 'merged_networks' key
-        instance_hyperparameters : dict, optional
-            Hyperparameters from the Class1NeuralNetwork instance.
-        network_weights : list of numpy.ndarray, optional
-            Saved weights used to infer the placeholder allele representation.
-        """
-        merged_configs = config['merged_networks']
-        merge_method = config.get('merge_method', 'average')
-
-        # Create a temporary instance to get encoding shape
-        base_hyperparameters = config.get('hyperparameters', {})
-        if instance_hyperparameters:
-            base_hyperparameters = dict(instance_hyperparameters)
-            base_hyperparameters.update(config.get('hyperparameters', {}))
-        base_hyperparameters = cls.hyperparameter_defaults.with_defaults(
-            cls.apply_hyperparameter_renames(dict(base_hyperparameters))
-        )
-        temp = cls(**base_hyperparameters)
-        peptide_encoding_shape = temp.peptides_to_network_input([]).shape[1:]
-        peptide_torch_encoding_name = _peptide_torch_encoding_name(
-            base_hyperparameters
-        )
-        if peptide_torch_encoding_name and len(peptide_encoding_shape) == 1:
-            peptide_encoding_shape = _peptide_torch_encoding_shape(
-                peptide_encoding_shape,
-                peptide_torch_encoding_name,
-            )
-
-        # Create placeholder allele representations for pan-allele models
-        allele_representations = cls._placeholder_allele_representations(
-            base_hyperparameters,
+        """Create a merged model from a config dict (see ``keras_model_config``)."""
+        return keras_model_config.create_merged_model_from_config(
+            config,
+            model_cls=Class1NeuralNetworkModel,
+            merged_model_cls=MergedClass1NeuralNetwork,
+            network_cls=cls,
+            instance_hyperparameters=instance_hyperparameters,
             network_weights=network_weights,
-            network_config=config,
         )
-
-        # Create sub-networks
-        sub_networks = []
-        for sub_config in merged_configs:
-            model = Class1NeuralNetworkModel(
-                peptide_encoding_shape=peptide_encoding_shape,
-                allele_representations=allele_representations,
-                locally_connected_layers=sub_config.get('locally_connected_layers', []),
-                peptide_dense_layer_sizes=sub_config.get('peptide_dense_layer_sizes', []),
-                allele_dense_layer_sizes=sub_config.get('allele_dense_layer_sizes', []),
-                layer_sizes=sub_config.get('layer_sizes', [32]),
-                peptide_allele_merge_method=sub_config.get('peptide_allele_merge_method', 'multiply'),
-                peptide_allele_merge_activation=sub_config.get('peptide_allele_merge_activation', ''),
-                activation=sub_config.get('activation', 'tanh'),
-                output_activation=sub_config.get('output_activation', 'sigmoid'),
-                dropout_probability=sub_config.get('dropout_probability', 0.0),
-                batch_normalization=sub_config.get('batch_normalization', False),
-                normalization=sub_config.get('normalization', 'none'),
-                dense_layer_l1_regularization=base_hyperparameters.get('dense_layer_l1_regularization', 0.001),
-                dense_layer_l2_regularization=base_hyperparameters.get('dense_layer_l2_regularization', 0.0),
-                topology=sub_config.get('topology', 'feedforward'),
-                num_outputs=sub_config.get('num_outputs', 1),
-                init=base_hyperparameters.get('init', 'glorot_uniform'),
-                peptide_input_vector_encoding_name=peptide_torch_encoding_name,
-            )
-            sub_networks.append(model)
-
-        return MergedClass1NeuralNetwork(sub_networks, merge_method=merge_method)
 
     @staticmethod
     def model_cache_key(network_json):
@@ -2113,9 +1372,7 @@ class Class1NeuralNetwork(object):
                 )
             else:
                 config = json.loads(self.network_json)
-                # Detect if weights are from Keras or PyTorch format
-                # Keras JSON has 'class_name': 'Model' or 'Functional'; PyTorch has 'hyperparameters'
-                is_keras_format = config.get('class_name') in ('Model', 'Functional')
+                is_keras_format = keras_model_config.is_keras_model_config(config)
                 # Pass this instance's hyperparameters to preserve peptide_encoding etc.
                 self._network = self._create_model_from_config(
                     config,
@@ -2247,7 +1504,7 @@ class Class1NeuralNetwork(object):
         config = dict(config)
 
         # Check if this is a legacy Keras JSON config
-        if config.get('class_name') in ('Model', 'Functional'):
+        if keras_model_config.is_keras_model_config(config):
             hyperparameters, keras_metadata = cls._parse_keras_json_config(config)
             instance = cls(**hyperparameters)
             # Store metadata for weight loading
@@ -2578,19 +1835,8 @@ class Class1NeuralNetwork(object):
 
     @staticmethod
     def _regularization_penalty(parameters, l1=0.0, l2=0.0):
-        """
-        Match Keras kernel_regularizer semantics used on dense kernels.
-        """
-        parameters = tuple(parameters)
-        if not parameters or (not l1 and not l2):
-            return None
-        penalty = torch.zeros((), device=parameters[0].device)
-        for param in parameters:
-            if l1:
-                penalty = penalty + (l1 * param.abs().sum())
-            if l2:
-                penalty = penalty + (l2 * param.square().sum())
-        return penalty
+        """Match Keras kernel_regularizer semantics used on dense kernels."""
+        return compute_regularization_penalty(parameters, l1=l1, l2=l2)
 
     def get_device(self):
         """Get the PyTorch device to use."""
@@ -2628,45 +1874,22 @@ class Class1NeuralNetwork(object):
         * random negatives, sample weights, and the affinity ``fit()`` row
           layout are not part of this API.
 
-        The method still shares the same low-level optimizer step, loss object,
-        regularization, and batched validation helpers as :meth:`fit`.
-
-        ``generator`` may yield either pre-encoded ``(x_dict, y)`` tuples
-        (the path the shipped pan-allele pretrain pipeline uses) or legacy
-        raw ``(allele_encoding, peptides, affinities)`` tuples. The legacy
-        form is still tested for back-compat but is not exercised by any
-        production pipeline. ``generator_factory`` enables DataLoader
-        worker prefetch: each worker calls it with ``worker_id`` and
-        ``num_workers`` to read a disjoint shard.
-
-        ``seed`` (int, optional) seeds numpy's and torch's global RNGs up
-        front, so weight initialization and any shuffling in this pretrain
-        pass derive from it; None leaves the worker's entropy seeding in
-        place. Mirrors :meth:`fit`'s ``seed`` so one value can drive both
-        phases of a pan-allele fit.
-
-        ``save_all_checkpoints`` retains both the terminal and
-        minimum-validation weights. It does not change which state is primary;
-        that remains controlled by the ``restore_best_weights`` hyperparameter.
+        The method shares the same low-level optimizer step, loss object,
+        regularization, validation, and early-stopping phase helpers in
+        :mod:`mhcflurry.class1_training` as :meth:`fit`.
         """
         self._clear_training_checkpoints()
         if self.prediction_cache is not None:
             self.prediction_cache.clear()
         device = self.get_device()
         configure_matmul_precision(device)
-
-        # Single-seed control, mirroring fit(): seed up front so weight init
-        # and shuffling in this pass are reproducible. See fit() for detail.
-        if seed is not None:
-            numpy.random.seed(int(seed) % (2 ** 32))
-            torch.manual_seed(int(seed) & ((1 << 63) - 1))
+        seed_training_rngs(seed)
 
         fit_info = collections.defaultdict(list)
         timing_enabled = _timing_enabled()
         fit_info["timing_enabled"] = timing_enabled
 
         loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
-
         (
             validation_allele_input,
             allele_representations,
@@ -2681,87 +1904,38 @@ class Class1NeuralNetwork(object):
                 print(self.network())
         network = self.network()
         network.to(device)
-
         self.set_allele_representations(allele_representations)
 
-        # Setup optimizer
         optimizer = self._create_optimizer(network)
         if self.hyperparameters["learning_rate"] is not None:
             for param_group in optimizer.param_groups:
-                param_group['lr'] = self.hyperparameters["learning_rate"]
-        fit_info["learning_rate"] = optimizer.param_groups[0]['lr']
+                param_group["lr"] = self.hyperparameters["learning_rate"]
+        fit_info["learning_rate"] = optimizer.param_groups[0]["lr"]
         regularization_parameters = tuple(self._regularized_parameters(network))
         l1_reg = self.hyperparameters["dense_layer_l1_regularization"]
         l2_reg = self.hyperparameters["dense_layer_l2_regularization"]
 
-        # Prepare validation data
-        validation_x_dict = {
-            "peptide": self.peptides_to_network_input(validation_peptide_encoding),
-        }
-        if validation_allele_input is not None:
-            validation_x_dict["allele"] = validation_allele_input
-        encode_y_kwargs = {}
-        if validation_inequalities is not None:
-            # from_ic50 is decreasing: concentration bounds reverse direction.
-            encode_y_kwargs["inequalities"] = (
-                pandas.Series(validation_inequalities)
-                .map({"=": "=", ">": "<", "<": ">"})
-                .values
-            )
-        if validation_output_indices is not None:
-            encode_y_kwargs["output_indices"] = validation_output_indices
+        (
+            val_peptide_device,
+            val_y_device,
+            val_allele_device,
+        ) = prepare_streaming_validation_tensors(
+            validation_peptide_encoding=validation_peptide_encoding,
+            validation_affinities=validation_affinities,
+            validation_allele_input=validation_allele_input,
+            validation_inequalities=validation_inequalities,
+            validation_output_indices=validation_output_indices,
+            loss_obj=loss_obj,
+            device=device,
+            peptides_to_network_input=self.peptides_to_network_input,
+        )
 
-        output = loss_obj.encode_y(from_ic50(validation_affinities), **encode_y_kwargs)
-
-        # Validation tensors are constant across streaming-pretrain epochs, but
-        # original code re-ran ``torch.from_numpy(...).float().to(device)``
-        # on every epoch — three H2D copies × many epochs. For large
-        # validation sets that's tens of ms/epoch of pure wasted bandwidth.
-        # Hoist the copy to happen once before the epoch loop.
-        #
-        # 2D int -> index-encoded; keep dtype intact so the embedding lookup
-        # inside forward() sees int indices. Vector-encoded inputs are numeric
-        # feature tensors and should reach the network as fp32.
-        _val_peptide_np = validation_x_dict["peptide"]
-        if (
-            _val_peptide_np.ndim == 2
-            and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
-        ):
-            val_peptide_device = torch_from_numpy(_val_peptide_np).to(device)
-        else:
-            val_peptide_device = torch_from_numpy(
-                _val_peptide_np).to(device).float()
-        val_allele_device = None
-        if "allele" in validation_x_dict:
-            val_allele_device = torch_from_numpy(
-                validation_x_dict["allele"]
-            ).to(device).float()
-        val_y_device = torch_from_numpy(
-            output.astype(numpy.float32)).to(device)
-
-        # Streaming-pretrain batches stay as numpy arrays until the parent
-        # training loop moves them to the device. That keeps worker-side
-        # prefetch compatible across platforms and still overlaps CSV /
-        # encoding work with GPU compute when a picklable encoded-batch
-        # generator_factory is supplied (the pretrain path).
-        mutable_generator_state = {"yielded_values": 0}
         dataloader_num_workers = self.hyperparameters.get(
             "dataloader_num_workers", 0
         )
-        # The streaming-pretrain DataLoader intentionally transports numpy arrays
-        # unchanged (``batch_size=None`` + ``_identity_collate``). Those arrays
-        # are not pinned, and setting non_blocking=True for pageable
-        # numpy-backed tensors lets CUDA retain source pages until later stream
-        # synchronization. Keep H2D copies synchronous so each pretrain chunk's
-        # CPU buffer can be released/reused immediately.
         non_blocking_h2d = False
         fit_info["dataloader_num_workers"] = dataloader_num_workers
         fit_info["validation_rows"] = len(validation_affinities)
-        # Worker-prefetch requires both (a) a picklable ``generator_factory``
-        # so each spawned worker can build its own shard, and (b)
-        # ``generator_batches_are_encoded=True`` so the dataset never
-        # holds bound methods of this ``Class1NeuralNetwork``. Either
-        # missing piece forces a single-process path.
         if dataloader_num_workers > 0 and (
             generator_factory is None or not generator_batches_are_encoded
         ):
@@ -2800,14 +1974,17 @@ class Class1NeuralNetwork(object):
             )
             return iterator_result
 
-        iterator = make_iterator()
+        stream_state = StreamingIteratorState(
+            iterator=make_iterator(),
+            make_iterator=make_iterator,
+            generator_factory=generator_factory,
+        )
 
-        # Data dependent init
         data_dependent_init = self.hyperparameters[
             "data_dependent_initialization_method"
         ]
         if data_dependent_init and not self.fit_info:
-            first_chunk = next(iterator)
+            first_chunk = next(stream_state.iterator)
             init_chunk = _materialize_repeated_peptide_batch(first_chunk)
             first_inputs = {"peptide": init_chunk["peptide"]}
             if "allele" in init_chunk:
@@ -2821,276 +1998,78 @@ class Class1NeuralNetwork(object):
                 ],
                 verbose=verbose,
             )
-            iterator = itertools.chain([first_chunk], iterator)
+            stream_state.iterator = itertools.chain(
+                [first_chunk], stream_state.iterator
+            )
 
-        # Compile AFTER LSUV init — LSUV registers + removes forward hooks
-        # during its activation-norm measurement pass, and every hook-count
-        # change invalidates dynamo's frame guard (``len(L['self']
-        # .dense_layers[0]._forward_hooks) != 1``). Compiling before LSUV
-        # burns through the 8-entry cache_size_limit in seconds and falls
-        # back to eager. Compiling after gives dynamo a single stable
-        # hook state to specialize on.
+        # Compile AFTER LSUV hook churn finishes.
         network = maybe_compile_network(network, device)
         eager_network = uncompiled_network(network)
-        # Compile the loss alongside the network; see maybe_compile_loss
-        # docstring. MSEWithInequalities eager-dispatches ~10 kernels
-        # per step; fusing them matters more as batch size grows (less
-        # compute to amortize launch overhead against).
         loss_obj = maybe_compile_loss(loss_obj, device)
 
-        min_val_loss_iteration = None
-        min_val_loss = None
-        best_state_dict = None
+        early_stopping_state = EarlyStoppingState()
         last_progress_print = 0
         first_batch_time = None
-
-        # The first batch establishes the compiled fast-path shape.
-        # Non-conforming later batches (most commonly a short final
-        # pretrain chunk) run eagerly to preserve exact semantics without
-        # triggering a second compile.
-        expected_chunk_shape = None
-
         validation_interval = _validation_interval_from_hyperparameters(
-            self.hyperparameters)
+            self.hyperparameters
+        )
 
         for epoch_index in range(int(epochs)):
-            epoch_num = epoch_index + 1
-            epoch_start_time = time.time()
-            epoch_wall_start = time.perf_counter()
-            network.train()
-
-            epoch_fetch_time = 0.0
-            epoch_h2d_time = 0.0
-
-            def prepared_streaming_batches():
-                nonlocal iterator
-                nonlocal expected_chunk_shape
-                nonlocal epoch_fetch_time
-                nonlocal epoch_h2d_time
-                for _step in range(steps_per_epoch):
-                    fetch_start = time.perf_counter()
-                    try:
-                        batch = next(iterator)
-                    except StopIteration:
-                        if generator_factory is None:
-                            break
-                        fit_info["iterator_restarts"] += 1
-                        iterator = make_iterator()
-                        try:
-                            batch = next(iterator)
-                        except StopIteration:
-                            break
-                    epoch_fetch_time += time.perf_counter() - fetch_start
-
-                    if expected_chunk_shape is None:
-                        expected_chunk_shape = batch["peptide"].shape
-                    # Measure H2D separately from training compute. When timing
-                    # is disabled, _timing_start/stop are cheap wall-clock reads;
-                    # when enabled, they synchronize around the copy.
-                    h2d_start = _timing_start(device, timing_enabled)
-                    inputs, y_tensor, weights_batch = _move_fit_batch_to_device(
-                        batch,
-                        device,
-                        non_blocking=non_blocking_h2d,
-                    )
-                    epoch_h2d_time += _timing_stop(
-                        h2d_start, device, timing_enabled
-                    )
-                    mutable_generator_state["yielded_values"] += len(batch["y"])
-                    yield {
-                        "network": (
-                            network
-                            if batch["peptide"].shape == expected_chunk_shape
-                            else eager_network
-                        ),
-                        "inputs": inputs,
-                        "y_batch": y_tensor,
-                        "weights_batch": weights_batch,
-                        "row_count": len(batch["y"]),
-                    }
-
-            train_epoch_result = _run_prepared_training_batches(
-                prepared_streaming_batches(),
+            epoch_outcome = run_streaming_training_epoch(
+                epoch_index=epoch_index,
+                epochs=epochs,
+                steps_per_epoch=steps_per_epoch,
+                min_epochs=min_epochs,
+                patience=patience,
+                min_delta=min_delta,
+                network=network,
+                eager_network=eager_network,
                 optimizer=optimizer,
                 loss_obj=loss_obj,
                 regularization_parameters=regularization_parameters,
                 l1_reg=l1_reg,
                 l2_reg=l2_reg,
-                timing_enabled=timing_enabled,
+                stream_state=stream_state,
+                val_peptide_device=val_peptide_device,
+                val_y_device=val_y_device,
+                val_allele_device=val_allele_device,
+                validation_count=len(validation_affinities),
+                early_stopping_state=early_stopping_state,
+                hyperparameters=self.hyperparameters,
+                fit_info=fit_info,
                 device=device,
-            )
-            if first_batch_time is None:
-                first_batch_time = train_epoch_result["first_batch_time"]
-
-            should_validate_this_epoch = _should_validate_epoch(
-                validation_enabled=True,
-                epoch_index=epoch_index,
-                max_epochs=epochs,
+                non_blocking_h2d=non_blocking_h2d,
+                num_workers_per_gpu=env_workers_per_gpu(),
+                timing_enabled=timing_enabled,
                 validation_interval=validation_interval,
-                early_stopping=True,
-                min_val_loss_epoch=min_val_loss_iteration,
-                patience=patience,
-                min_epochs=min_epochs,
-                # Streaming pretrain stops inclusively (epoch >= threshold) to
-                # match pre-2.3.0 weights — see _early_stop_reached.
-                strict=False,
+                save_all_checkpoints=save_all_checkpoints,
+                progress_callback=progress_callback,
+                progress_preamble=progress_preamble,
+                progress_print_interval=progress_print_interval,
+                last_progress_print=last_progress_print,
             )
-            validation_time = 0.0
-            val_batch_size = None
-            val_loss = _carry_forward_validation_loss(fit_info)
-            if should_validate_this_epoch:
-                # Compute validation loss in fixed-size batches — reuse the
-                # device tensors hoisted before the epoch loop (val data is
-                # static). Single-shot forward pass over the entire pretrain
-                # validation set (typically 50K+ rows) was dominating VRAM.
-                # By default validation uses the eager network to avoid a
-                # second torch.compile specialization for grad-disabled eval.
-                network.eval()
-                with torch.inference_mode():
-                    validation_start = _timing_start(device, timing_enabled)
-                    if "effective_validation_batch_size" not in fit_info:
-                        fit_info["effective_validation_batch_size"] = (
-                            effective_validation_batch_size(
-                                device,
-                                self.hyperparameters["validation_batch_size"],
-                                self.hyperparameters["minibatch_size"],
-                                model=eager_network,
-                                num_workers_per_gpu=env_workers_per_gpu(),
-                                total_rows=len(val_peptide_device),
-                            )
-                        )
-                    val_batch_size = fit_info[
-                        "effective_validation_batch_size"]
-                    val_loss = _batched_validation_loss(
-                        network=validation_forward_network(network, eager_network),
-                        eager_network=eager_network,
-                        val_peptide=val_peptide_device,
-                        val_allele=val_allele_device,
-                        val_y=val_y_device,
-                        val_weights=None,
-                        loss_obj=loss_obj,
-                        batch_size=val_batch_size,
-                    )
-                    regularization_penalty = self._regularization_penalty(
-                        regularization_parameters,
-                        l1=l1_reg,
-                        l2=l2_reg,
-                    )
-                    if regularization_penalty is not None:
-                        val_loss = val_loss + regularization_penalty.item()
-                    validation_time = _timing_stop(
-                        validation_start, device, timing_enabled
-                    )
-                fit_info["val_loss"].append(val_loss)
-                previous_min_val_loss_iteration = min_val_loss_iteration
-                (
-                    min_val_loss,
-                    min_val_loss_iteration,
-                ) = _update_min_validation_loss(
-                    val_loss=val_loss,
-                    epoch_index=epoch_index,
-                    min_val_loss=min_val_loss,
-                    min_val_loss_epoch=min_val_loss_iteration,
-                    min_delta=min_delta,
-                )
-                if (
-                    (
-                        self.hyperparameters["restore_best_weights"]
-                        or save_all_checkpoints
-                    )
-                    and min_val_loss_iteration != previous_min_val_loss_iteration
-                ):
-                    best_state_dict = copy_module_state_dict_to_cpu(
-                        eager_network)
-            else:
-                fit_info["val_loss"].append(val_loss)
-
-            epoch_time = time.time() - epoch_start_time
-            train_loss, epoch_loss_sync_time = _sync_mean_loss(
-                train_epoch_result["losses"],
-                device=device,
-                timing_enabled=timing_enabled,
-            )
-            fit_info["loss"].append(train_loss)
-            if timing_enabled:
-                fit_info["epoch_fetch_time"].append(epoch_fetch_time)
-                fit_info["epoch_h2d_time"].append(epoch_h2d_time)
-                fit_info["epoch_train_time"].append(
-                    train_epoch_result["train_time"])
-                fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
-                fit_info["epoch_validation_time"].append(validation_time)
-                fit_info["epoch_num_train_batches"].append(
-                    len(train_epoch_result["losses"]))
-                fit_info["epoch_num_train_rows"].append(
-                    train_epoch_result["train_rows"])
-                fit_info["epoch_num_validation_batches"].append(
-                    int(numpy.ceil(len(validation_affinities) / val_batch_size))
-                    if val_batch_size else 0
-                )
-                fit_info["epoch_total_time"].append(
-                    time.perf_counter() - epoch_wall_start
-                )
-
-            progress_message = (
-                "epoch %3d/%3d [%0.2f sec.]: loss=%g val_loss=%g. Min val "
-                "loss %g at epoch %s. Cum. points: %d."
-                % (
-                    epoch_num,
-                    epochs,
-                    epoch_time,
-                    train_loss,
-                    val_loss,
-                    min_val_loss if min_val_loss is not None else numpy.nan,
-                    (
-                        min_val_loss_iteration + 1
-                        if min_val_loss_iteration is not None else None
-                    ),
-                    mutable_generator_state["yielded_values"],
-                )
-            ).strip()
-
-            if progress_print_interval is not None and (
-                time.time() - last_progress_print > progress_print_interval
-            ):
-                print(progress_preamble, progress_message)
-                last_progress_print = time.time()
-
-            if progress_callback:
-                progress_callback()
-
-            if _early_stop_reached(
-                epoch_index=epoch_index,
-                min_val_loss_epoch=min_val_loss_iteration,
-                patience=patience,
-                min_epochs=min_epochs,
-                early_stopping=True,
-                # Inclusive stop (epoch >= threshold) reproduces the pre-2.3.0
-                # streaming condition `epoch >= min_val_loss_iteration +
-                # patience`; the strict `>` default would train one extra epoch.
-                strict=False,
-            ):
-                if progress_print_interval is not None:
-                    print(progress_preamble, "STOPPING", progress_message)
+            last_progress_print = epoch_outcome["last_progress_print"]
+            if first_batch_time is None:
+                first_batch_time = epoch_outcome["first_batch_time"]
+            if epoch_outcome["should_stop"]:
                 break
 
         restored_best_weights = self._finalize_training_checkpoints(
             eager_network,
-            best_state_dict,
+            early_stopping_state.best_state_dict,
             save_all_checkpoints,
         )
-        fit_info["best_epoch"] = (
-            min_val_loss_iteration + 1
-            if min_val_loss_iteration is not None else None)
-        fit_info["best_val_loss"] = min_val_loss
-        fit_info["restored_best_weights"] = restored_best_weights
-        fit_info["saved_checkpoint_policies"] = (
-            self.available_checkpoint_policies()
+        self.fit_info.append(
+            record_fit_summary(
+                fit_info=fit_info,
+                early_stopping_state=early_stopping_state,
+                restored_best_weights=restored_best_weights,
+                saved_checkpoint_policies=self.available_checkpoint_policies(),
+                elapsed_seconds=time.time() - start,
+                num_points=stream_state.yielded_values,
+                first_batch_time=first_batch_time,
+            )
         )
-        fit_info["time"] = time.time() - start
-        fit_info["num_points"] = mutable_generator_state["yielded_values"]
-        if first_batch_time is not None:
-            fit_info["first_batch_time"] = first_batch_time
-        self.fit_info.append(dict(fit_info))
 
     def _random_negatives_pool_for_fit(
             self,
@@ -3200,18 +2179,8 @@ class Class1NeuralNetwork(object):
             self.prediction_cache.clear()
         device = self.get_device()
         configure_matmul_precision(device)
+        seed_training_rngs(seed)
 
-        # One seed controls every stochastic step in this fit. Seed numpy's
-        # and torch's global RNGs up front so weight init, the example
-        # shuffle, the per-epoch batch shuffle, and random-negative
-        # sampling all derive from it. Left untouched when seed is None
-        # (entropy-seeded by the worker), keeping training stochastic.
-        if seed is not None:
-            numpy.random.seed(int(seed) % (2 ** 32))
-            torch.manual_seed(int(seed) & ((1 << 63) - 1))
-
-        encodable_peptides = EncodableSequences.create(peptides)
-        peptide_encoding = self.peptides_to_network_input(encodable_peptides)
         fit_info = collections.defaultdict(list)
         timing_enabled = _timing_enabled()
         fit_info["timing_enabled"] = timing_enabled
@@ -3219,146 +2188,33 @@ class Class1NeuralNetwork(object):
             "dataloader_num_workers", 0
         )
 
-        random_negatives_planner = RandomNegativePeptides(
-            **RandomNegativePeptides.hyperparameter_defaults.subselect(
-                self.hyperparameters
-            )
-        )
-        random_negatives_planner.plan(
-            peptides=encodable_peptides.sequences,
+        loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
+        prepared = prepare_affinity_inputs(
+            peptides=peptides,
             affinities=affinities,
-            alleles=allele_encoding.alleles if allele_encoding else None,
+            allele_encoding=allele_encoding,
             inequalities=inequalities,
-        )
-
-        random_negatives_allele_encoding = None
-        if allele_encoding is not None:
-            random_negatives_allele_encoding = AlleleEncoding(
-                random_negatives_planner.get_alleles(), borrow_from=allele_encoding
-            )
-        num_random_negatives = random_negatives_planner.get_total_count()
-
-        # Pre-generate random-negative peptides + encodings once per pool cycle
-        # rather than once per epoch. At pool_epochs=1 the pool regenerates
-        # every epoch, matching the default "fresh negatives each epoch"
-        # semantics.
-        random_negative_pool_epochs = int(
-            self.hyperparameters.get("random_negative_pool_epochs", 1) or 1
-        )
-        if random_negative_pool_epochs < 1:
-            random_negative_pool_epochs = 1
-        # When negatives are pooled across cycles the pool needs an explicit
-        # seed (it pre-generates once and slices), so feed it the master
-        # seed. At pool_epochs == 1 the pool regenerates every epoch from
-        # numpy's global RNG, which the master seed above already pins — so
-        # leave pool_seed None and let the global stream drive it.
-        pool_seed = (
-            seed
-            if random_negative_pool_epochs > 1
-            else None
-        )
-        requested_fit_tensor_residency = self.hyperparameters.get(
-            "fit_tensor_residency"
-        )
-        # Random negatives stay worker-local. For torch-index peptide
-        # inputs, the pool samples and aligns int8 AA indices directly on
-        # the active torch device. Host-vector models use the same encoder
-        # as their real peptides so the training input shape remains identical.
-        (
-            random_negatives_pool,
-            random_negative_pool_residency,
-        ) = self._random_negatives_pool_for_fit(
-            random_negatives_planner=random_negatives_planner,
-            random_negative_pool_epochs=random_negative_pool_epochs,
-            pool_seed=pool_seed,
+            output_indices=output_indices,
+            sample_weights=sample_weights,
+            shuffle_permutation=shuffle_permutation,
+            hyperparameters=self.hyperparameters,
+            loss_obj=loss_obj,
             device=device,
-            requested_fit_tensor_residency=requested_fit_tensor_residency,
+            seed=seed,
+            peptides_to_network_input=self.peptides_to_network_input,
+            allele_encoding_to_network_input=self.allele_encoding_to_network_input,
+            random_negatives_pool_factory=self._random_negatives_pool_for_fit,
         )
         fit_info["random_negative_pool_residency"] = (
-            random_negative_pool_residency
+            prepared.random_negative_pool_residency
         )
-        fit_info["random_negative_pool_epochs"] = random_negative_pool_epochs
-
-        # Allele encoding for random negatives is planned once (the allele
-        # list is a deterministic function of the planner's plan_df). Hoist
-        # it out of the epoch loop; it is a deterministic function of the plan.
-        random_negative_x_allele_base = None
-        if (
-            num_random_negatives > 0
-            and random_negatives_allele_encoding is not None
-        ):
-            (
-                random_negative_x_allele_base,
-                _,
-            ) = self.allele_encoding_to_network_input(
-                random_negatives_allele_encoding
-            )
-
-        y_values = from_ic50(numpy.asarray(affinities))
-        assert numpy.isnan(y_values).sum() == 0, y_values
-
-        if inequalities is not None:
-            adjusted_inequalities = (
-                pandas.Series(inequalities)
-                .map({
-                    "=": "=",
-                    ">": "<",
-                    "<": ">",
-                })
-                .values
-            )
-        else:
-            adjusted_inequalities = numpy.tile("=", len(y_values))
-
-        if len(adjusted_inequalities) != len(y_values):
-            raise ValueError("Inequalities and y_values must have same length")
-
-        x_dict_without_random_negatives = {
-            "peptide": peptide_encoding,
-        }
-        allele_representations = None
-        if allele_encoding is not None:
-            (
-                allele_encoding_input,
-                allele_representations,
-            ) = self.allele_encoding_to_network_input(allele_encoding)
-            x_dict_without_random_negatives["allele"] = allele_encoding_input
-
-        # Shuffle
-        if shuffle_permutation is None:
-            shuffle_permutation = numpy.random.permutation(len(y_values))
-        y_values = y_values[shuffle_permutation]
-        adjusted_inequalities = adjusted_inequalities[shuffle_permutation]
-        for key in x_dict_without_random_negatives:
-            x_dict_without_random_negatives[key] = x_dict_without_random_negatives[key][
-                shuffle_permutation
-            ]
-        if sample_weights is not None:
-            sample_weights = numpy.asarray(sample_weights)[shuffle_permutation]
-        if output_indices is not None:
-            output_indices = numpy.asarray(output_indices)[shuffle_permutation]
-
-        loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
-
-        if not loss_obj.supports_inequalities and (
-            any(inequality != "=" for inequality in adjusted_inequalities)
-        ):
-            raise ValueError("Loss %s does not support inequalities" % loss_obj)
-
-        if (
-            not loss_obj.supports_multiple_outputs
-            and output_indices is not None
-            and (output_indices != 0).any()
-        ):
-            raise ValueError("Loss %s does not support multiple outputs" % loss_obj)
-
-        if self.hyperparameters["num_outputs"] != 1:
-            if output_indices is None:
-                raise ValueError("Must supply output_indices for multi-output predictor")
+        fit_info["random_negative_pool_epochs"] = (
+            prepared.random_negative_pool_epochs
+        )
 
         if self.network() is None:
             self._network = self.make_network(
-                allele_representations=allele_representations,
+                allele_representations=prepared.allele_representations,
                 **self.network_hyperparameter_defaults.subselect(self.hyperparameters)
             )
             if verbose > 0:
@@ -3366,33 +2222,20 @@ class Class1NeuralNetwork(object):
 
         network = self.network()
         network.to(device)
-
-        if allele_representations is not None:
-            self.set_allele_representations(allele_representations)
-
-        # Keep an eager handle even when max_epochs == 0. Ordinarily this is
-        # refreshed after optional LSUV initialization and torch.compile in
-        # the epoch loop, but checkpoint finalization also runs for zero-epoch
-        # fits (used by command smoke tests and model initialization flows).
+        if prepared.allele_representations is not None:
+            self.set_allele_representations(prepared.allele_representations)
         eager_network = uncompiled_network(network)
 
-        # Guard against silent training-time OOMs. When many workers
-        # share one GPU (pan-allele default max_workers_per_gpu=2 on
-        # A100-80GB), the naive minibatch_size from the hyperparameters
-        # YAML may not fit per-worker. Shrink loudly for the duration
-        # of this fit() call only — DO NOT mutate self.hyperparameters,
-        # so the saved model config preserves the user's original
-        # intent. fit_info carries the actual value used at run time.
-        _requested_minibatch = int(self.hyperparameters["minibatch_size"])
-        _effective_minibatch, _shrunk = check_training_batch_fits(
-            _requested_minibatch,
+        requested_minibatch = int(self.hyperparameters["minibatch_size"])
+        effective_minibatch, shrunk = check_training_batch_fits(
+            requested_minibatch,
             device,
             network,
             num_workers_per_gpu=env_workers_per_gpu(1),
         )
-        if _shrunk:
-            fit_info["minibatch_size_shrunk_from"] = _requested_minibatch
-            fit_info["minibatch_size_shrunk_to"] = _effective_minibatch
+        if shrunk:
+            fit_info["minibatch_size_shrunk_from"] = requested_minibatch
+            fit_info["minibatch_size_shrunk_to"] = effective_minibatch
             if seed is not None:
                 logging.warning(
                     "fit(seed=%s) shrank minibatch_size %d -> %d to fit "
@@ -3400,599 +2243,98 @@ class Class1NeuralNetwork(object):
                     "effective minibatch size, so this run may not reproduce "
                     "bit-for-bit on a GPU with different free memory or a "
                     "different number of workers per card.",
-                    seed, _requested_minibatch, _effective_minibatch)
-        fit_info["effective_minibatch_size"] = _effective_minibatch
+                    seed,
+                    requested_minibatch,
+                    effective_minibatch,
+                )
+        fit_info["effective_minibatch_size"] = effective_minibatch
 
         optimizer = self._create_optimizer(network)
         if self.hyperparameters["learning_rate"] is not None:
             for param_group in optimizer.param_groups:
-                param_group['lr'] = self.hyperparameters["learning_rate"]
-        fit_info["learning_rate"] = optimizer.param_groups[0]['lr']
+                param_group["lr"] = self.hyperparameters["learning_rate"]
+        fit_info["learning_rate"] = optimizer.param_groups[0]["lr"]
 
-        # Prepare y values with random negatives
-        if loss_obj.supports_inequalities:
-            random_negative_ic50 = self.hyperparameters["random_negative_affinity_min"]
-            random_negative_target = from_ic50(random_negative_ic50)
-
-            y_with_negatives = numpy.concatenate([
-                numpy.tile(random_negative_target, num_random_negatives),
-                y_values,
-            ])
-            adjusted_inequalities_with_random_negatives = (
-                ["<"] * num_random_negatives + list(adjusted_inequalities)
-            )
-        else:
-            y_with_negatives = numpy.concatenate([
-                from_ic50(
-                    numpy.random.uniform(
-                        self.hyperparameters["random_negative_affinity_min"],
-                        self.hyperparameters["random_negative_affinity_max"],
-                        num_random_negatives,
-                    )
-                ),
-                y_values,
-            ])
-            adjusted_inequalities_with_random_negatives = None
-
-        if sample_weights is not None:
-            sample_weights_with_negatives = numpy.concatenate([
-                numpy.ones(num_random_negatives),
-                sample_weights
-            ])
-        else:
-            sample_weights_with_negatives = None
-
-        if output_indices is not None:
-            random_negative_output_indices = (
-                self.hyperparameters["random_negative_output_indices"]
-                if self.hyperparameters["random_negative_output_indices"]
-                else list(range(0, self.hyperparameters["num_outputs"]))
-            )
-            output_indices_with_negatives = numpy.concatenate([
-                pandas.Series(random_negative_output_indices, dtype=int)
-                .sample(n=num_random_negatives, replace=True)
-                .values,
-                output_indices,
-            ])
-        else:
-            output_indices_with_negatives = None
-
-        # Encode y
-        encode_y_kwargs = {}
-        if adjusted_inequalities_with_random_negatives is not None:
-            encode_y_kwargs["inequalities"] = adjusted_inequalities_with_random_negatives
-        if output_indices_with_negatives is not None:
-            encode_y_kwargs["output_indices"] = output_indices_with_negatives
-
-        y_encoded = loss_obj.encode_y(y_with_negatives, **encode_y_kwargs)
-
-        min_val_loss_iteration = None
-        min_val_loss = None
-        best_state_dict = None
-
-        needs_initialization = (
-            self.hyperparameters["data_dependent_initialization_method"] is not None
-            and not self.fit_info
+        device_data = build_affinity_device_data(
+            prepared=prepared,
+            hyperparameters=self.hyperparameters,
+            loss_obj=loss_obj,
+            device=device,
         )
-
-        start = time.time()
-        last_progress_print = None
-        first_batch_time = None
-
-        # Validation split (fixed across epochs; only training data is reshuffled)
-        val_split = self.hyperparameters["validation_split"]
-        n_total = len(y_encoded)
-        n_train, n_val = validation_split_counts(n_total, val_split)
-        indices = numpy.arange(n_total)
-        if n_val > 0:
-            train_indices_base = indices[:n_train]
-            val_indices = indices[n_train:]
-        else:
-            train_indices_base = indices
-            val_indices = None
-        fit_info["train_rows"] = int(n_train)
-        fit_info["validation_rows"] = int(n_val)
-        fit_info["num_random_negatives"] = int(num_random_negatives)
+        fit_info["train_rows"] = device_data.n_train
+        fit_info["validation_rows"] = device_data.n_val
+        fit_info["num_random_negatives"] = int(prepared.num_random_negatives)
+        fit_info["validation_cache_reused"] = device_data.val_cache_reused
+        fit_info["fit_tensor_residency"] = "device"
+        logging.info("fit tensor residency: device (device=%s)", device.type)
 
         regularization_parameters = tuple(self._regularized_parameters(network))
         l1_reg = self.hyperparameters["dense_layer_l1_regularization"]
         l2_reg = self.hyperparameters["dense_layer_l2_regularization"]
 
-        # The validation set indexes into the concatenated
-        # [random_negs | training] array via val_indices. The training portion
-        # is static across epochs; the random-negative portion changes.
-        # When val_indices points entirely into the training portion (the
-        # common case — with default val_split=0.1 and random_negative_rate=1,
-        # val set is the tail 10% of the ~2x-size concatenated array, all in
-        # training portion), x_peptide[val_indices] and x_allele[val_indices]
-        # are stable across epochs. Materialize them on device once to save
-        # ~60 MB+ H2D per epoch.
-        #
-        # When overlap IS possible (unusual hyperparameter combos), skip the
-        # cache and fall back to per-epoch copy (preserved behavior).
-        # Check EVERY val index, not just the first — val_indices can be
-        # unsorted (scikit-learn's train_test_split sometimes produces
-        # shuffled indices). A leading value ≥ num_random_negatives does
-        # not guarantee all subsequent values are in the training portion;
-        # the weight/peptide slicing below would then index into the
-        # random-negative portion, which mutates per epoch → stale tensors.
-        _val_cache_safe = (
-            val_indices is not None
-            and len(val_indices) > 0
-            and bool(numpy.all(val_indices >= num_random_negatives))
+        early_stopping_state = EarlyStoppingState()
+        needs_initialization = (
+            self.hyperparameters["data_dependent_initialization_method"] is not None
+            and not self.fit_info
         )
-        fit_info["validation_cache_reused"] = _val_cache_safe
-        _val_device_tensors = None
-        if _val_cache_safe:
-            val_training_indices = val_indices - num_random_negatives
-            # 2D int is index-encoded (keep dtype); 3D int is an already
-            # materialized vector-encoded payload (widen to fp32).
-            _val_peptide_np = x_dict_without_random_negatives["peptide"][
-                val_training_indices
-            ]
-            if (
-                _val_peptide_np.ndim == 2
-                and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
-            ):
-                _val_peptide_device = torch_from_numpy(_val_peptide_np).to(device)
-            else:
-                _val_peptide_device = torch_from_numpy(
-                    _val_peptide_np).float().to(device)
-            _val_y_device = torch_from_numpy(
-                y_encoded[val_indices].astype(numpy.float32)
-            ).to(device)
-            _val_allele_device = None
-            if "allele" in x_dict_without_random_negatives:
-                _val_allele_device = torch_from_numpy(
-                    x_dict_without_random_negatives["allele"][val_training_indices]
-                ).float().to(device)
-            _val_weights_device = None
-            if sample_weights_with_negatives is not None:
-                _val_weights_device = torch_from_numpy(
-                    sample_weights_with_negatives[val_indices]
-                ).float().to(device)
-            _val_device_tensors = (
-                _val_peptide_device,
-                _val_y_device,
-                _val_allele_device,
-                _val_weights_device,
-            )
-
-        # AffinityDeviceTrainingData owns the device row space for this
-        # fit: [random negatives | real examples]. The training loop only
-        # asks it for indexed batches and refills the random-negative slice
-        # once per epoch.
-        random_neg_template = None
-        if num_random_negatives > 0:
-            _, random_neg_template = random_negatives_pool.get_epoch_inputs(0)
-        affinity_training_data = AffinityDeviceTrainingData.from_arrays(
-            x_peptide=x_dict_without_random_negatives["peptide"],
-            x_allele=x_dict_without_random_negatives.get("allele"),
-            y_encoded=y_encoded,
-            sample_weights=sample_weights_with_negatives,
-            random_negative_x_peptide_template=random_neg_template,
-            random_negative_x_allele=random_negative_x_allele_base,
-            device=device,
-        )
-        fit_info["fit_tensor_residency"] = "device"
-        logging.info("fit tensor residency: device (device=%s)", device.type)
+        start = time.time()
+        last_progress_print = None
+        first_batch_time = None
 
         for epoch in range(self.hyperparameters["max_epochs"]):
-            epoch_wall_start = time.perf_counter()
-            # Coarse + fine timing buckets — kept for back-compat with
-            # downstream telemetry consumers; the host-path-specific
-            # buckets (dataset construction, dataloader setup) stay
-            # at zero in the device-only world.
-            input_build_time = 0.0
-            rn_pool_get_time = 0.0
-            rn_refill_time = 0.0
-            dataset_construction_time = 0.0
-            initialization_time = 0.0
-            shuffle_dataset_time = 0.0
-            dataloader_setup_time = 0.0
-            train_loop_wall_time = 0.0
-            train_loop_time = 0.0
-            epoch_h2d_time = 0.0
-            epoch_loss_sync_time = 0.0
-            validation_materialize_time = 0.0
-            validation_compute_time = 0.0
-            callback_time = 0.0
-            gc_time = 0.0
-
-            # Per-epoch random-negatives slice. With ``pool_epochs=1``
-            # this regenerates every epoch (legacy behavior); with
-            # ``pool_epochs=N`` the encoding pass runs once per N
-            # epochs and this is an O(1) view.
-            rn_get_start = time.perf_counter()
-            if epoch == 0 and random_neg_template is not None:
-                random_negative_peptides_encoding = random_neg_template
-                random_neg_template = None
-            else:
-                _, random_negative_peptides_encoding = (
-                    random_negatives_pool.get_epoch_inputs(epoch)
-                )
-            rn_pool_get_time += time.perf_counter() - rn_get_start
-
-            rn_refill_start = time.perf_counter()
-            affinity_training_data.refill_random_negative_peptides(
-                random_negative_peptides_encoding
-            )
-            rn_refill_time += time.perf_counter() - rn_refill_start
-            input_build_time = rn_pool_get_time + rn_refill_time
-
-            if needs_initialization:
-                init_start = _timing_start(device, timing_enabled)
-                init_batch = affinity_training_data.batch_dict_for_indices(
-                    indices, device=device
-                )
-                self.data_dependent_weights_initialization(
-                    network,
-                    init_batch,
-                    method=self.hyperparameters["data_dependent_initialization_method"],
-                    target=self.hyperparameters[
-                        "data_dependent_initialization_target"
-                    ],
-                    verbose=verbose,
-                )
-                initialization_time += _timing_stop(
-                    init_start, device, timing_enabled
-                )
-                needs_initialization = False
-
-            # Compile AFTER LSUV hook churn finishes (see fit_streaming_batches
-            # comment above). Idempotent: maybe_compile_network returns
-            # the OptimizedModule unchanged if ``network`` is already
-            # compiled, so it's safe to call every epoch. First epoch's
-            # first batch pays the codegen cost; rest runs compiled.
-            network = maybe_compile_network(network, device)
-            eager_network = uncompiled_network(network)
-            # Same rationale as fit_streaming_batches' loss-compile call.
-            loss_obj = maybe_compile_loss(loss_obj, device)
-
-            # Train indices live on device — train_indices_base is
-            # contiguous [0, n_train), so a shuffled view is just
-            # torch.randperm(n_train) on device with no host array
-            # or H2D copy.
-            dataset_start = time.perf_counter()
-            train_indices_dev_full = torch.randperm(
-                train_indices_base.shape[0], device=device,
-            )
-            shuffle_dataset_time += time.perf_counter() - dataset_start
-
-            # Training
-            network.train()
-            epoch_start = time.time()
-            train_loop_wall_start = time.perf_counter()
-
-            batch_size = _effective_minibatch
-            n_train_epoch = int(train_indices_dev_full.shape[0])
-            full_batch_count = (n_train_epoch // batch_size) * batch_size
-
-            def prepared_device_batches(
-                    full_batch_count=full_batch_count,
-                    train_indices_dev_full=train_indices_dev_full,
-                    batch_size=batch_size,
-                    network=network,
-                    n_train_epoch=n_train_epoch,
-                    eager_network=eager_network):
-                # --- Device-resident inner loop ---
-                # No DataLoader, no per-batch H2D. Indices live on device;
-                # batches are built by index_select into the combined
-                # buffer that holds [RN | real] rows.
-                if full_batch_count > 0:
-                    train_indices_dev = train_indices_dev_full[:full_batch_count]
-                    num_full_batches = full_batch_count // batch_size
-                    for step in range(num_full_batches):
-                        batch_indices = train_indices_dev[
-                            step * batch_size : (step + 1) * batch_size
-                        ]
-                        inputs, y_batch, weights_batch = (
-                            affinity_training_data.batch_for_indices(batch_indices)
-                        )
-                        yield {
-                            "network": network,
-                            "inputs": inputs,
-                            "y_batch": y_batch,
-                            "weights_batch": weights_batch,
-                            "row_count": int(y_batch.shape[0]),
-                        }
-                tail_count = n_train_epoch - full_batch_count
-                if tail_count > 0:
-                    tail_indices_dev = train_indices_dev_full[full_batch_count:]
-                    inputs, y_batch, weights_batch = (
-                        affinity_training_data.batch_for_indices(tail_indices_dev)
-                    )
-                    yield {
-                        "network": eager_network,
-                        "inputs": inputs,
-                        "y_batch": y_batch,
-                        "weights_batch": weights_batch,
-                        "row_count": int(y_batch.shape[0]),
-                    }
-
-            train_epoch_result = _run_prepared_training_batches(
-                prepared_device_batches(),
+            epoch_outcome = run_affinity_training_epoch(
+                epoch=epoch,
+                network=network,
+                eager_network=eager_network,
                 optimizer=optimizer,
                 loss_obj=loss_obj,
                 regularization_parameters=regularization_parameters,
                 l1_reg=l1_reg,
                 l2_reg=l2_reg,
-                timing_enabled=timing_enabled,
+                prepared=prepared,
+                device_data=device_data,
+                early_stopping_state=early_stopping_state,
+                hyperparameters=self.hyperparameters,
+                fit_info=fit_info,
                 device=device,
+                effective_minibatch=effective_minibatch,
+                num_workers_per_gpu=env_workers_per_gpu(),
+                timing_enabled=timing_enabled,
+                needs_initialization=needs_initialization,
+                data_dependent_init_fn=self.data_dependent_weights_initialization,
+                verbose=verbose,
+                save_all_checkpoints=save_all_checkpoints,
+                progress_callback=progress_callback,
+                progress_preamble=progress_preamble,
+                progress_print_interval=progress_print_interval,
+                last_progress_print=last_progress_print,
             )
-            train_loop_time += train_epoch_result["train_time"]
+            network = epoch_outcome["network"]
+            eager_network = epoch_outcome["eager_network"]
+            loss_obj = epoch_outcome["loss_obj"]
+            needs_initialization = epoch_outcome["needs_initialization"]
+            last_progress_print = epoch_outcome["last_progress_print"]
             if first_batch_time is None:
-                first_batch_time = train_epoch_result["first_batch_time"]
-
-            epoch_time = time.time() - epoch_start
-            train_loop_wall_time = time.perf_counter() - train_loop_wall_start
-            train_loss, epoch_loss_sync_time = _sync_mean_loss(
-                train_epoch_result["losses"],
-                device=device,
-                timing_enabled=timing_enabled,
-            )
-            fit_info["loss"].append(train_loss)
-
-            # Validation — batched so every GPU invocation is fixed-size
-            # and peak VRAM stays bounded regardless of n_val. By default
-            # validation uses the eager network to avoid a second
-            # torch.compile specialization for grad-disabled eval.
-            #
-            # Three conditions trigger a measurement; otherwise the val
-            # pass is skipped and the previous measurement is carried
-            # forward so fit_info["val_loss"] stays one-per-epoch:
-            #   1. on a ``validation_interval`` cadence (the routine case);
-            #   2. on the final epoch of the loop (so the saved model
-            #      always reflects an up-to-date val_loss);
-            #   3. when patience would trigger this epoch (so the saved
-            #      val_loss reflects the actual stop state, not a stale
-            #      carried-forward value).
-            validation_interval = _validation_interval_from_hyperparameters(
-                self.hyperparameters)
-            val_batch_size = None
-            should_validate_this_epoch = _should_validate_epoch(
-                validation_enabled=val_split > 0,
-                epoch_index=epoch,
-                max_epochs=self.hyperparameters["max_epochs"],
-                validation_interval=validation_interval,
-                early_stopping=self.hyperparameters.get("early_stopping", False),
-                min_val_loss_epoch=min_val_loss_iteration,
-                patience=self.hyperparameters["patience"],
-            )
-            if val_split > 0 and not should_validate_this_epoch:
-                prev_val_loss = _carry_forward_validation_loss(fit_info)
-                fit_info["val_loss"].append(prev_val_loss)
-                val_loss = prev_val_loss
-            if should_validate_this_epoch:
-                network.eval()
-                with torch.inference_mode():
-                    if _val_device_tensors is not None:
-                        # Fast path: reuse tensors materialized once before the
-                        # epoch loop. Saves ~60 MB+ H2D copy per epoch. Bit-
-                        # identical because val_indices points entirely into
-                        # the static training portion of x_peptide/x_allele.
-                        (
-                            val_peptide,
-                            val_y,
-                            val_allele,
-                            val_weights,
-                        ) = _val_device_tensors
-                    else:
-                        # Rare case: val_indices overlaps the per-epoch
-                        # random-negative slice. Build the batch directly
-                        # from the device-resident combined buffer.
-                        materialize_start = time.perf_counter()
-                        val_indices_dev = torch.as_tensor(
-                            val_indices, dtype=torch.long, device=device,
-                        )
-                        val_inputs, val_y, val_weights = (
-                            affinity_training_data.batch_for_indices(val_indices_dev)
-                        )
-                        val_peptide = val_inputs["peptide"]
-                        val_allele = val_inputs.get("allele")
-                        validation_materialize_time += (
-                            time.perf_counter() - materialize_start
-                        )
-                    if "effective_validation_batch_size" not in fit_info:
-                        fit_info["effective_validation_batch_size"] = (
-                            effective_validation_batch_size(
-                                device,
-                                self.hyperparameters["validation_batch_size"],
-                                batch_size,
-                                model=eager_network,
-                                num_workers_per_gpu=env_workers_per_gpu(),
-                                total_rows=len(val_y),
-                            )
-                        )
-                    val_batch_size = fit_info[
-                        "effective_validation_batch_size"]
-                    validation_start = _timing_start(device, timing_enabled)
-                    val_loss = _batched_validation_loss(
-                        network=validation_forward_network(network, eager_network),
-                        eager_network=eager_network,
-                        val_peptide=val_peptide,
-                        val_allele=val_allele,
-                        val_y=val_y,
-                        val_weights=val_weights,
-                        loss_obj=loss_obj,
-                        batch_size=val_batch_size,
-                    )
-                    regularization_penalty = self._regularization_penalty(
-                        regularization_parameters,
-                        l1=l1_reg,
-                        l2=l2_reg,
-                    )
-                    if regularization_penalty is not None:
-                        val_loss = val_loss + regularization_penalty.item()
-                    validation_compute_time += _timing_stop(
-                        validation_start, device, timing_enabled
-                    )
-                fit_info["val_loss"].append(val_loss)
-
-            # Progress printing
-            if progress_print_interval is not None and (
-                not last_progress_print
-                or (time.time() - last_progress_print > progress_print_interval)
-            ):
-                print(
-                    (
-                        progress_preamble
-                        + " "
-                        + "Epoch %3d / %3d [%0.2f sec]: loss=%g. "
-                        "Min val loss (%s) at epoch %s"
-                        % (
-                            epoch,
-                            self.hyperparameters["max_epochs"],
-                            epoch_time,
-                            train_loss,
-                            str(min_val_loss),
-                            min_val_loss_iteration,
-                        )
-                    ).strip()
-                )
-                last_progress_print = time.time()
-
-            # Early stopping. ``min_val_loss`` / ``min_val_loss_iteration``
-            # only update on epochs where validation actually ran — on
-            # skipped epochs ``val_loss`` is the carried-forward previous
-            # measurement and would never beat the current min anyway, so
-            # restricting the update is for clarity (the patience counter
-            # is anchored to the epoch the measurement was taken, not a
-            # later epoch that copied the same value).
-            if val_split > 0:
-                if should_validate_this_epoch:
-                    previous_min_val_loss_iteration = min_val_loss_iteration
-                    min_val_loss, min_val_loss_iteration = (
-                        _update_min_validation_loss(
-                            val_loss=val_loss,
-                            epoch_index=epoch,
-                            min_val_loss=min_val_loss,
-                            min_val_loss_epoch=min_val_loss_iteration,
-                            min_delta=self.hyperparameters["min_delta"],
-                        )
-                    )
-                    if (
-                        (
-                            self.hyperparameters["restore_best_weights"]
-                            or save_all_checkpoints
-                        )
-                        and min_val_loss_iteration != previous_min_val_loss_iteration
-                    ):
-                        best_state_dict = copy_module_state_dict_to_cpu(
-                            eager_network)
-
-                if self.hyperparameters["early_stopping"]:
-                    if _early_stop_reached(
-                        epoch_index=epoch,
-                        min_val_loss_epoch=min_val_loss_iteration,
-                        patience=self.hyperparameters["patience"],
-                        early_stopping=True,
-                    ):
-                        if progress_print_interval is not None:
-                            print(
-                                (
-                                    progress_preamble
-                                    + " "
-                                    + "Stopping at epoch %3d / %3d: loss=%g. "
-                                    "Min val loss (%g) at epoch %s"
-                                    % (
-                                        epoch,
-                                        self.hyperparameters["max_epochs"],
-                                        train_loss,
-                                        min_val_loss if min_val_loss is not None else numpy.nan,
-                                        min_val_loss_iteration,
-                                    )
-                                ).strip()
-                            )
-                        break
-
-            if progress_callback:
-                callback_start = time.perf_counter()
-                progress_callback()
-                callback_time += time.perf_counter() - callback_start
-
-            gc_start = time.perf_counter()
-            gc.collect()
-            gc_time += time.perf_counter() - gc_start
-            if timing_enabled:
-                # Coarse + fine-grained input-build buckets. The split was
-                # added to find the unaccounted 35 s/epoch gap on the
-                # 2026-04-28 release_full run (epoch_total_time ~45 s,
-                # sum of pre-split components ~10 s).
-                fit_info["epoch_input_build_time"].append(input_build_time)
-                fit_info["epoch_rn_pool_get_time"].append(rn_pool_get_time)
-                fit_info["epoch_random_negative_refill_time"].append(
-                    rn_refill_time
-                )
-                fit_info["epoch_dataset_construction_time"].append(
-                    dataset_construction_time
-                )
-                fit_info["epoch_initialization_time"].append(
-                    initialization_time
-                )
-                fit_info["epoch_shuffle_dataset_time"].append(
-                    shuffle_dataset_time
-                )
-                fit_info["epoch_dataloader_setup_time"].append(
-                    dataloader_setup_time
-                )
-                fit_info["epoch_h2d_time"].append(epoch_h2d_time)
-                fit_info["epoch_train_time"].append(train_loop_time)
-                fit_info["epoch_train_loop_wall_time"].append(
-                    train_loop_wall_time
-                )
-                # The dataloader-iter overhead is the wall time of the
-                # `for batch in loader:` loop minus the per-batch GPU
-                # compute and H2D copies that are timed separately. It
-                # captures DataLoader worker IPC, prefetcher waits,
-                # Python iterator overhead, and any compile-recompile
-                # storms — i.e. exactly the gap that was unaccounted
-                # for in the pre-split breakdown.
-                fit_info["epoch_dataloader_iter_overhead_time"].append(
-                    max(0.0, train_loop_wall_time - epoch_h2d_time - train_loop_time)
-                )
-                fit_info["epoch_loss_sync_time"].append(epoch_loss_sync_time)
-                fit_info["epoch_validation_materialize_time"].append(
-                    validation_materialize_time
-                )
-                fit_info["epoch_validation_time"].append(
-                    validation_compute_time
-                )
-                fit_info["epoch_num_train_batches"].append(
-                    len(train_epoch_result["losses"]))
-                fit_info["epoch_num_train_rows"].append(
-                    train_epoch_result["train_rows"])
-                fit_info["epoch_tail_train_rows"].append(
-                    n_train_epoch - full_batch_count
-                )
-                fit_info["epoch_num_validation_batches"].append(
-                    int(numpy.ceil(n_val / val_batch_size))
-                    if val_batch_size else 0
-                )
-                fit_info["epoch_callback_time"].append(callback_time)
-                fit_info["epoch_gc_time"].append(gc_time)
-                fit_info["epoch_total_time"].append(
-                    time.perf_counter() - epoch_wall_start
-                )
+                first_batch_time = epoch_outcome["first_batch_time"]
+            if epoch_outcome["should_stop"]:
+                break
 
         restored_best_weights = self._finalize_training_checkpoints(
             eager_network,
-            best_state_dict,
+            early_stopping_state.best_state_dict,
             save_all_checkpoints,
         )
-        fit_info["best_epoch"] = (
-            min_val_loss_iteration + 1
-            if min_val_loss_iteration is not None else None)
-        fit_info["best_val_loss"] = min_val_loss
-        fit_info["restored_best_weights"] = restored_best_weights
-        fit_info["saved_checkpoint_policies"] = (
-            self.available_checkpoint_policies()
+        self.fit_info.append(
+            record_fit_summary(
+                fit_info=fit_info,
+                early_stopping_state=early_stopping_state,
+                restored_best_weights=restored_best_weights,
+                saved_checkpoint_policies=self.available_checkpoint_policies(),
+                elapsed_seconds=time.time() - start,
+                num_points=len(peptides),
+                first_batch_time=first_batch_time,
+            )
         )
-        fit_info["time"] = time.time() - start
-        fit_info["num_points"] = len(peptides)
-        if first_batch_time is not None:
-            fit_info["first_batch_time"] = first_batch_time
-        self.fit_info.append(dict(fit_info))
 
     def predict(
             self,

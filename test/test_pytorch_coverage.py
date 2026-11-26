@@ -388,7 +388,7 @@ class TestMergedClass1NeuralNetwork:
 
     def test_average(self):
         merged = self._make_merged("average")
-        inp = {"peptide": torch.randn(3, *merged.networks[0].peptide_encoding_shape)}
+        inp = {"peptide": torch.randint(0, 21, (3, merged.networks[0].peptide_encoding_shape[0]), dtype=torch.int8)}
         out = merged(inp)
         # Average of 2 networks
         individual = [net(inp) for net in merged.networks]
@@ -397,7 +397,7 @@ class TestMergedClass1NeuralNetwork:
 
     def test_sum(self):
         merged = self._make_merged("sum")
-        inp = {"peptide": torch.randn(3, *merged.networks[0].peptide_encoding_shape)}
+        inp = {"peptide": torch.randint(0, 21, (3, merged.networks[0].peptide_encoding_shape[0]), dtype=torch.int8)}
         out = merged(inp)
         individual = [net(inp) for net in merged.networks]
         expected = torch.stack(individual, dim=-1).sum(dim=-1)
@@ -405,7 +405,7 @@ class TestMergedClass1NeuralNetwork:
 
     def test_concatenate(self):
         merged = self._make_merged("concatenate")
-        inp = {"peptide": torch.randn(3, *merged.networks[0].peptide_encoding_shape)}
+        inp = {"peptide": torch.randint(0, 21, (3, merged.networks[0].peptide_encoding_shape[0]), dtype=torch.int8)}
         out = merged(inp)
         individual = [net(inp) for net in merged.networks]
         expected = torch.cat(individual, dim=-1)
@@ -414,7 +414,7 @@ class TestMergedClass1NeuralNetwork:
     def test_unknown_merge_method_raises(self):
         merged = self._make_merged("average")
         merged.merge_method = "bad"
-        inp = {"peptide": torch.randn(1, *merged.networks[0].peptide_encoding_shape)}
+        inp = {"peptide": torch.randint(0, 21, (1, merged.networks[0].peptide_encoding_shape[0]), dtype=torch.int8)}
         with pytest.raises(ValueError, match="Unknown merge method"):
             merged(inp)
 
@@ -423,7 +423,7 @@ class TestMergedClass1NeuralNetwork:
         weights = merged.get_weights_list()
         assert len(weights) > 0
         # Setting the same weights back should not change outputs
-        inp = {"peptide": torch.randn(2, *merged.networks[0].peptide_encoding_shape)}
+        inp = {"peptide": torch.randint(0, 21, (2, merged.networks[0].peptide_encoding_shape[0]), dtype=torch.int8)}
         out_before = merged(inp).detach().clone()
         merged.set_weights_list(weights)
         out_after = merged(inp)
@@ -436,8 +436,6 @@ class TestMergedClass1NeuralNetwork:
 class TestSkipConnectionsTopology:
     def test_forward_pass(self):
         from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
-        # Topology/init coverage builds the model from a pre-encoded (L, V)
-        # peptide shape directly (the peptide encoding path is index-only now).
         peptide_shape = (15, 21)
         torch.manual_seed(7)
         model = Class1NeuralNetworkModel(
@@ -445,14 +443,12 @@ class TestSkipConnectionsTopology:
             layer_sizes=[8, 8, 4],
             topology="with-skip-connections",
         )
-        inp = {"peptide": torch.randn(2, *peptide_shape)}
+        inp = {"peptide": torch.randint(0, 21, (2, peptide_shape[0]), dtype=torch.int8)}
         out = model(inp)
         assert out.shape == (2, 1)
 
     def test_different_from_feedforward(self):
         from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
-        # Topology/init coverage builds the model from a pre-encoded (L, V)
-        # peptide shape directly (the peptide encoding path is index-only now).
         peptide_shape = (15, 21)
 
         torch.manual_seed(99)
@@ -467,7 +463,7 @@ class TestSkipConnectionsTopology:
             layer_sizes=[8, 8],
             topology="feedforward",
         )
-        inp = {"peptide": torch.randn(2, *peptide_shape)}
+        inp = {"peptide": torch.randint(0, 21, (2, peptide_shape[0]), dtype=torch.int8)}
         out_skip = skip_model(inp)
         out_ff = ff_model(inp)
         # Different topologies should give different outputs (skip model has

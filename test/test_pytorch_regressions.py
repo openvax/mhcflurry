@@ -123,22 +123,19 @@ def test_validation_split_counts_match_keras_rounding():
 
 def test_affinity_lsuv_observes_post_activation_dense_output():
     model = Class1NeuralNetworkModel(
-        peptide_encoding_shape=(2, 2),
+        peptide_encoding_shape=(2, 21),
         layer_sizes=[3],
         activation="tanh",
         output_activation="sigmoid",
-        peptide_input_is_indices=False,
     )
-    peptide = np.array(
-        [
-            [[2.0, -1.0], [0.5, 3.0]],
-            [[-2.0, 1.0], [1.5, -3.0]],
-        ],
-        dtype=np.float32,
-    )
+    peptide = np.array([[0, 5], [10, 15]], dtype=np.int8)
     inputs = {"peptide": peptide}
     with torch.no_grad():
-        flattened = torch.from_numpy(peptide).reshape(2, -1)
+        embedded = torch.nn.functional.embedding(
+            torch.from_numpy(peptide).long(),
+            model.peptide_embedding_table,
+        )
+        flattened = embedded.reshape(2, -1)
         raw = model.dense_layers[0](flattened)
         expected = torch.tanh(raw).numpy()
 
@@ -659,7 +656,7 @@ def test_fit_validation_interval_default_runs_every_epoch():
 
 
 def test_affinity_fit_can_restore_best_validation_checkpoint(monkeypatch):
-    import mhcflurry.class1_neural_network as affinity_module
+    import mhcflurry.class1_training as training_module
 
     calls = []
 
@@ -671,7 +668,7 @@ def test_affinity_fit_can_restore_best_validation_checkpoint(monkeypatch):
         }
 
     monkeypatch.setattr(
-        affinity_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
+        training_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
     model = _make_simple_affinity_model(
         max_epochs=2,
         validation_split=0.5,
@@ -737,7 +734,7 @@ def test_affinity_refit_discards_persisted_checkpoint_references(tmp_path, save_
 
 def test_affinity_fit_retains_distinct_terminal_and_best_checkpoints(
         monkeypatch, tmp_path):
-    import mhcflurry.class1_neural_network as affinity_module
+    import mhcflurry.class1_training as training_module
 
     def zero_checkpoint(module):
         return {
@@ -746,7 +743,7 @@ def test_affinity_fit_retains_distinct_terminal_and_best_checkpoints(
         }
 
     monkeypatch.setattr(
-        affinity_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
+        training_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
     model = _make_simple_affinity_model(
         max_epochs=2,
         validation_split=0.5,
@@ -1032,7 +1029,7 @@ def test_modern_activations_are_supported(activation):
 
 def test_affinity_layer_normalization_is_batch_composition_invariant():
     model = Class1NeuralNetworkModel(
-        peptide_encoding_shape=(3, 2),
+        peptide_encoding_shape=(3, 21),
         layer_sizes=[4],
         normalization="layer",
     )
@@ -1041,13 +1038,13 @@ def test_affinity_layer_normalization_is_batch_composition_invariant():
     assert model.layer_norm_early is not None
     assert model.layer_norms[0] is not None
 
-    inputs = torch.randn(3, 3, 2)
+    inputs = torch.randint(0, 21, (3, 3), dtype=torch.int8)
     single = model({"peptide": inputs[:1]})
     batched = model({"peptide": inputs})[:1]
     torch.testing.assert_close(single, batched)
 
     clone = Class1NeuralNetworkModel(
-        peptide_encoding_shape=(3, 2),
+        peptide_encoding_shape=(3, 21),
         layer_sizes=[4],
         normalization="layer",
     )
@@ -1087,7 +1084,7 @@ def test_locally_connected_initializer_uses_keras_fans(monkeypatch):
 
 
 def test_network_forward_requires_allele_key_to_match_model_type():
-    peptide_input = torch.ones((2, 9, 21), dtype=torch.float32)
+    peptide_input = torch.zeros((2, 9), dtype=torch.int8)
 
     pan_model = Class1NeuralNetworkModel(
         peptide_encoding_shape=(9, 21),
@@ -1213,7 +1210,9 @@ def test_forward_cartesian_from_peptide_stage_matches_expanded_path(merge_method
     )
     network.eval()
 
-    peptide = torch.randn(3, *network.peptide_encoding_shape)
+    peptide = torch.randint(
+        0, 21, (3, network.peptide_encoding_shape[0]), dtype=torch.int8
+    )
     allele_idx = torch.tensor([1, 3])
     with torch.no_grad():
         peptide_stage = network.forward_peptide_stage(peptide)
@@ -1389,7 +1388,9 @@ def test_forward_cartesian_skip_connections_matches_expanded(layer_sizes):
     )
     network.eval()
 
-    peptide = torch.randn(3, *network.peptide_encoding_shape)
+    peptide = torch.randint(
+        0, 21, (3, network.peptide_encoding_shape[0]), dtype=torch.int8
+    )
     allele_idx = torch.tensor([1, 3])
     with torch.no_grad():
         peptide_stage = network.forward_peptide_stage(peptide)
