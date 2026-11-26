@@ -759,3 +759,77 @@ def test_bare_uniprot_accessions_not_misparsed_as_mhc_alleles():
 
     built_raw = build_pseudosequences_from_mhcseqs(rows=rows, normalize_alleles=False)
     assert set(built_raw) == {"HLA-A*02:01", "H2LR16", "P01898"}
+
+
+def test_accessioned_alleles_flow_through_build_and_predictor():
+    """Canonical mhcgnomes.AccessionedAllele identifiers (mhcseqs >= 2.14)
+    flow cleanly through build_pseudosequences_from_mhcseqs and
+    Class1AffinityPredictor under normalize_alleles=True."""
+    rows = [
+        {
+            "two_field_allele": "HLA-A*02:01",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            "two_field_allele": "TriakisScyllium-UAA*uniprot:O46817",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            "two_field_allele": "OryziasLatipes-UBA*uniprot:H2LR16",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            "two_field_allele": "SarcophilusHarrisii*uniprot:G3V1L5 class I",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            # Class II accessioned allele must never be admitted as Class I.
+            "two_field_allele": "Saha*uniprot:G3V1L5 class II",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            # Bare UniProt accession remains excluded under normalize_alleles=True.
+            "two_field_allele": "H2LR16",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+    ]
+
+    built = build_pseudosequences_from_mhcseqs(rows=rows, normalize_alleles=True)
+    assert set(built) == {
+        "HLA-A*02:01",
+        "TriakisScyllium-UAA*uniprot:O46817",
+        "OryziasLatipes-UBA*uniprot:H2LR16",
+        "Saha*uniprot:G3V1L5 class I",
+    }
+
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": HLA_A0201_EXPECTED_39AA}
+    )
+    added = predictor.extend_alleles_from_mhcseqs(rows=rows)
+    assert added == 3
+    assert (
+        predictor.canonicalize_allele_name("SarcophilusHarrisii*uniprot:G3V1L5 class I")
+        == "Saha*uniprot:G3V1L5 class I"
+    )
+    assert (
+        predictor.canonicalize_allele_name("TriakisScyllium-UAA*uniprot:O46817")
+        == "TriakisScyllium-UAA*uniprot:O46817"
+    )

@@ -5,6 +5,12 @@ ablation experiments supporting MHCflurry releases.
 
 ## 2.5 series
 
+- {doc}`experiment_25x_pan_class_ii` *(2026-11-25)* — Speculative zero-shot
+  Class I → Class II transfer test: mapping Class II `DR`/`DQ`/`DP`
+  heterodimers into MHCflurry's 39-aa groove representation via `mhcseqs`
+  pan-class IMGT G-DOMAIN alignments and benchmarking frozen Class I `2.3.0`
+  weights against `NetMHCIIpan-4.3` and an `HLA-A*02:01` negative control
+  across 15 alleles (`7,500` 15-mer IC50 pairs).
 - {doc}`experiment_25x_cross_species_hitlist` *(2026-11-25)* — Zero-shot
   Class I Affinity and Presentation (+ real species proteome flanks) validation
   across 11 previously unseen vertebrate species and 3 binding-pocket mutants
@@ -31,5 +37,6 @@ sweeps, and historical public-data replays) live in the repository's
 :maxdepth: 1
 :hidden:
 
+experiment_25x_pan_class_ii
 experiment_25x_cross_species_hitlist
 ```

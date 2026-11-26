@@ -90,8 +90,9 @@ In a controlled A/B pan-allele training run (`[1024, 1024]` architecture, `30,76
 
 This directly validated migrating `downloads-generation/allele_sequences/GENERATE.sh` to `mhcflurry pseudosequences build --lock-existing` with `verify_trained_allele_parity.py` enforcing `308 / 308` bit-for-bit identical trained alleles.
 
-## Upstream data hygiene issues discovered & filed during this campaign
+## Upstream data hygiene & nomenclature unification issues
 
 - [`pirl-unc/mhcseqs#141`](https://github.com/pirl-unc/mhcseqs/issues/141) *(closed in `mhcseqs 2.12.5`)* — canonical names for `H2-D*q` (`Q31145`), `H2-L*q` (`Q31151`), `Gogo-B*01:01`, `HLA-A*30:14L`.
-- [`pirl-unc/mhcgnomes#306`](https://github.com/pirl-unc/mhcgnomes/issues/306) — bare UniProt accessions (`H2LR16..44` Japanese medaka fish → mouse `H2-L*r16..44`; `P01898..` → human pseudogene `HLA-P*`); defensively guarded in `mhcflurry 2.5.8`.
+- [`pirl-unc/mhcgnomes#306`](https://github.com/pirl-unc/mhcgnomes/issues/306) *(closed in `mhcgnomes 3.87.0`)* — bare UniProt accessions (`H2LR16..44` Japanese medaka fish → mouse `H2-L*r16..44`; `P01898..` → human pseudogene `HLA-P*`); fixed upstream in `mhcgnomes 3.87.0` and also guarded defensively in `mhcflurry >= 2.5.8`.
+- [`pirl-unc/mhcgnomes#311`](https://github.com/pirl-unc/mhcgnomes/issues/311) & [`pirl-unc/mhcseqs#150`](https://github.com/pirl-unc/mhcseqs/issues/150) / [`#152`](https://github.com/pirl-unc/mhcseqs/pull/152) *(shipped in `mhcgnomes 3.84+` and `mhcseqs 2.14.0`)* — unifies sequence-backed non-model vertebrate MHC identifiers (e.g. `TriakisScyllium-UAA*uniprot:O46817`, `Saha*uniprot:G3V1L5 class I`) across `mhcgnomes`, `mhcseqs`, and `mhcflurry >= 2.5.9` under `normalize_alleles=True` (`26,156` alleles across `223` canonical / `233` raw species labels, including `2,884` `AccessionedAllele`s and `0` unparsed rows).
 - [`pirl-unc/hitlist#977`](https://github.com/pirl-unc/hitlist/issues/977) — 9 hardcoded UniProt proteome UPIDs in `hitlist/downloads.py` pointing to wrong organisms (e.g., `trichosurus_vulpecula.fasta` → sesame seed `Sesamum indicum`, `hpv16` → 45 MB poplar tree `Populus trichocarpa`).
