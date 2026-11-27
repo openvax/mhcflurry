@@ -546,3 +546,110 @@ def test_stdout_contains_only_parseable_csv(capsys):
     assert frame.affinity.notna().all()
     assert "Predicting" not in output.out
     assert "Predicting affinities." in output.err
+
+
+@pytest.mark.parametrize("chunk_size", [1, 2])
+def test_chunk_size_fasta_matches_unchunked(tmp_path, chunk_size):
+    """Streaming --chunk-size on FASTA must match unchunked rows & values (#175)."""
+    unchunked_out = tmp_path / "unchunked.csv"
+    chunked_out = tmp_path / f"chunked_{chunk_size}.csv"
+    common = [
+        data_path("example.fasta"),
+        "--alleles",
+        "HLA-A*02:01,HLA-A*03:01,HLA-B*57:01",
+        "--peptide-lengths", "9",
+        "--threshold-affinity-percentile", "5.0",
+    ]
+    predict_scan_command.run(common + ["--out", str(unchunked_out)])
+    predict_scan_command.run(
+        common + ["--chunk-size", str(chunk_size), "--out", str(chunked_out)])
+
+    unchunked = read_output_csv(str(unchunked_out))
+    chunked = read_output_csv(str(chunked_out))
+    assert list(chunked.columns) == list(unchunked.columns)
+    assert len(chunked) == len(unchunked) > 0
+
+    key_cols = ["sequence_name", "pos", "peptide", "sample_name"]
+    unchunked_sorted = unchunked.sort_values(key_cols).reset_index(drop=True)
+    chunked_sorted = chunked.sort_values(key_cols).reset_index(drop=True)
+    pandas.testing.assert_frame_equal(chunked_sorted, unchunked_sorted)
+
+
+def test_chunk_size_csv_and_sequences_and_empty_chunks(tmp_path):
+    """Test --chunk-size on CSV (with/without IDs), --sequences, and 0-hit chunks."""
+    seqs = [
+        "MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT",
+        "ASDFGHKLPLPLPLPL",
+        "QWERTYIPCVNMLLLM",
+    ]
+    csv_in = tmp_path / "input.csv"
+    pandas.DataFrame({"sequence": seqs}).to_csv(csv_in, index=False)
+
+    # CSV without sequence_id column: generated sequence_0/1/2 IDs must match.
+    out_unchunked = tmp_path / "csv_unchunked.csv"
+    out_chunked = tmp_path / "csv_chunked.csv"
+    common_csv = [
+        str(csv_in),
+        "--alleles", "HLA-A*02:01",
+        "--peptide-lengths", "9",
+        "--results-all",
+    ]
+    predict_scan_command.run(common_csv + ["--out", str(out_unchunked)])
+    predict_scan_command.run(
+        common_csv + ["--chunk-size", "2", "--out", str(out_chunked)])
+    key_cols = ["sequence_name", "pos", "peptide", "sample_name"]
+    pandas.testing.assert_frame_equal(
+        read_output_csv(str(out_chunked)).sort_values(key_cols).reset_index(drop=True),
+        read_output_csv(str(out_unchunked)).sort_values(key_cols).reset_index(drop=True),
+    )
+
+    # --sequences with --chunk-size 1
+    out_seq_unchunked = tmp_path / "seq_unchunked.csv"
+    out_seq_chunked = tmp_path / "seq_chunked.csv"
+    common_seq = [
+        "--sequences", *seqs,
+        "--alleles", "HLA-A*02:01",
+        "--peptide-lengths", "9",
+        "--results-all",
+    ]
+    predict_scan_command.run(common_seq + ["--out", str(out_seq_unchunked)])
+    predict_scan_command.run(
+        common_seq + ["--chunk-size", "1", "--out", str(out_seq_chunked)])
+    pandas.testing.assert_frame_equal(
+        read_output_csv(str(out_seq_chunked)).sort_values(key_cols).reset_index(drop=True),
+        read_output_csv(str(out_seq_unchunked)).sort_values(key_cols).reset_index(drop=True),
+    )
+
+    # All chunks filtered out by an impossible threshold must still write header.
+    out_filtered = tmp_path / "filtered_empty.csv"
+    predict_scan_command.run([
+        "--sequences", *seqs,
+        "--alleles", "HLA-A*02:01",
+        "--peptide-lengths", "9",
+        "--threshold-affinity", "0.0001",
+        "--chunk-size", "1",
+        "--out", str(out_filtered),
+    ])
+    filtered_df = read_output_csv(str(out_filtered))
+    assert len(filtered_df) == 0
+    assert list(filtered_df.columns) == list(read_output_csv(str(out_seq_unchunked)).columns)
+
+    # Empty CSV input with --chunk-size must emit matching schema without crashing.
+    empty_in = tmp_path / "empty.csv"
+    empty_in.write_text("sequence\n")
+    out_empty = tmp_path / "empty_out.csv"
+    predict_scan_command.run([
+        str(empty_in),
+        "--alleles", "HLA-A*02:01",
+        "--peptide-lengths", "9",
+        "--chunk-size", "2",
+        "--out", str(out_empty),
+    ])
+    empty_df = read_output_csv(str(out_empty))
+    assert len(empty_df) == 0
+    assert list(empty_df.columns) == list(read_output_csv(str(out_seq_unchunked)).columns)
+
+    # Non-positive --chunk-size is rejected by argparse.
+    with pytest.raises(SystemExit) as exc:
+        predict_scan_command.parser.parse_args(["--chunk-size", "0", "--sequences", "SIINFEKL"])
+    assert exc.value.code == 2

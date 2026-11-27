@@ -282,8 +282,12 @@ def do_process_samples(samples, seed=None, constant_data=None):
             return part.assign(sample_id=sample_id, hit=0)
 
         if args.negative_policy == "matched":
+            sampler_name = (
+                "numeric-positions-v1" if numeric else "precomputed-table-sample-v1"
+            )
             selected_df = yield from sample_preparation_steps(
-                args, sample_id, sub_hit_df, sample_seed, initial_pool, additional)
+                args, sample_id, sub_hit_df, sample_seed, initial_pool, additional,
+                sampler=sampler_name)
         else:
             merged_df = initial_pool()
             response = yield merged_df.peptide

@@ -39,6 +39,7 @@ Output columns:
   presentation_percentile   Presentation percentile (0-100%; lower is tighter)
 """
 import collections
+import itertools
 import os
 import re
 import sys
@@ -47,7 +48,7 @@ import argcomplete
 
 from .completion import is_completing
 from .help import HelpArgumentParser
-from ..cli_args import add_alleles_arg, add_out_arg
+from ..cli_args import add_alleles_arg, add_out_arg, positive_int_arg
 from ..downloads import get_default_class1_presentation_models_dir, get_model_release_dir
 from ..parallelism import add_prediction_parallelism_args
 from ..version import __version__
@@ -96,6 +97,14 @@ input_args.add_argument(
     action="store_true",
     default=False,
     help="Return NaNs for unsupported alleles or peptides instead of raising")
+input_args.add_argument(
+    "--chunk-size",
+    type=positive_int_arg,
+    metavar="N",
+    default=None,
+    help="Process input sequences in streaming chunks of at most N sequences "
+    "to bound peak memory on large inputs. When set, predictions are sorted "
+    "within each chunk rather than globally across the entire input.")
 
 results_args = parser.add_argument_group(title="Result options")
 results_args.add_argument(
@@ -283,6 +292,197 @@ def parse_peptide_lengths(value):
     return peptide_lengths
 
 
+def _resolve_input_format(args, arg_parser):
+    """Determine input file format ('csv' or 'fasta') from args."""
+    input_format = args.input_format
+    if input_format == "guess":
+        parts = args.input.lower().split(".")
+        extension = parts[-1]
+        compression = None
+        if extension in ("gz", "gzip", "bz2", "bzip2") and len(parts) >= 2:
+            compression = extension
+            extension = parts[-2]
+
+        if extension == "csv":
+            input_format = "csv"
+        elif extension in ("fasta", "fa") and compression not in ("bz2", "bzip2"):
+            input_format = "fasta"
+        else:
+            arg_parser.error(
+                "Couldn't guess input format from file extension: %s\n"
+                "Pass the --input-format argument to specify if it is a "
+                "CSV or fasta file" % args.input)
+        print(
+            "Guessed input file format:", input_format,
+            file=sys.stderr)
+    elif input_format not in ("csv", "fasta"):
+        arg_parser.error("Unsupported input format: %r" % (input_format,))
+    return input_format
+
+
+def _iter_sequence_chunks(args, input_format, arg_parser, pandas, FastaParser):
+    """Yield ``dict[sequence_id, sequence]`` chunks of at most ``args.chunk_size``."""
+    chunk_size = args.chunk_size
+    if args.input:
+        if input_format == "csv":
+            try:
+                header_df = pandas.read_csv(
+                    args.input, keep_default_na=False, dtype=str, nrows=0)
+            except (FileNotFoundError, OSError, ValueError) as error:
+                arg_parser.error(str(error))
+            if args.sequence_column not in header_df.columns:
+                arg_parser.error(
+                    "No such column '%s' in CSV. Columns are: %s" % (
+                        args.sequence_column,
+                        ", ".join(["'%s'" % c for c in header_df.columns])))
+            print(
+                "Streaming input CSV in chunks of %d sequences, columns are: %s" % (
+                    chunk_size, ", ".join(header_df.columns)),
+                file=sys.stderr)
+            try:
+                reader = pandas.read_csv(
+                    args.input,
+                    keep_default_na=False,
+                    dtype=str,
+                    chunksize=chunk_size)
+                for chunk_df in reader:
+                    if len(chunk_df) == 0:
+                        continue
+                    if args.sequence_id_column not in chunk_df:
+                        chunk_df[args.sequence_id_column] = (
+                            "sequence_" + chunk_df.index.astype(str))
+                    chunk_df = chunk_df.set_index(args.sequence_id_column)
+                    yield chunk_df[args.sequence_column].to_dict()
+            except (FileNotFoundError, OSError, ValueError) as error:
+                arg_parser.error(str(error))
+        elif input_format == "fasta":
+            print(
+                "Streaming %s in chunks of %d sequences" % (
+                    args.input, chunk_size),
+                file=sys.stderr)
+            use_fasta_id = args.sequence_id_column == "sequence_id"
+            batch = {}
+            row_index = 0
+            try:
+                for seq_id, sequence in FastaParser().iterate_over_file(args.input):
+                    key = seq_id if use_fasta_id else ("sequence_%d" % row_index)
+                    batch[key] = sequence
+                    row_index += 1
+                    if len(batch) >= chunk_size:
+                        yield batch
+                        batch = {}
+                if batch:
+                    yield batch
+            except (FileNotFoundError, OSError, ValueError) as error:
+                arg_parser.error(str(error))
+        else:
+            arg_parser.error("Unsupported input format: %r" % (input_format,))
+    else:
+        for start in range(0, len(args.sequences), chunk_size):
+            end = min(start + chunk_size, len(args.sequences))
+            yield {
+                "sequence_%d" % idx: args.sequences[idx]
+                for idx in range(start, end)
+            }
+
+
+def _filter_scan_results(result_df, alleles, args, explicit_thresholds, arg_parser):
+    """Drop synthetic sample_name in processing-only mode and apply thresholds."""
+    # In processing-only mode (no --alleles), omit the synthetic sample_name
+    # placeholder ("sample1") since no sample was requested (#424).
+    if not alleles and "sample_name" in result_df.columns:
+        result_df = result_df.drop(columns=["sample_name"])
+
+    # Apply thresholds, skipping ones whose column is missing (e.g.
+    # processing-only run with no alleles, or --no-affinity-percentile
+    # leaves affinity_percentile out).
+    threshold_filters = [
+        ("presentation_score", args.threshold_presentation_score, "ge"),
+        ("processing_score", args.threshold_processing_score, "ge"),
+        ("affinity", args.threshold_affinity, "le"),
+        ("affinity_percentile", args.threshold_affinity_percentile, "le"),
+    ]
+    for col, thresh, op in threshold_filters:
+        if thresh is None:
+            continue
+        if col not in result_df.columns:
+            if col in explicit_thresholds:
+                arg_parser.error(
+                    "Cannot apply --threshold-%s: column '%s' is not present "
+                    "in prediction output" % (col.replace("_", "-"), col)
+                )
+            continue
+        if op == "ge":
+            result_df = result_df.loc[result_df[col] >= thresh]
+        else:
+            result_df = result_df.loc[result_df[col] <= thresh]
+    return result_df
+
+
+def _predict_sequence_batch(
+        sequences,
+        alleles,
+        models_dir,
+        peptide_lengths,
+        args,
+        worker_pool,
+        affinity_model_kwargs,
+        chunk_ranges_for_local_parallelism,
+        Class1PresentationPredictor,
+        pandas,
+        predictor=None):
+    """Run presentation/processing prediction for a dict of sequences."""
+    if worker_pool is None:
+        if predictor is None:
+            predictor = _load_predictor_for_command(models_dir)
+        return predictor.predict_sequences(
+            sequences=sequences,
+            alleles=alleles,
+            result="all",
+            peptide_lengths=peptide_lengths,
+            use_flanks=not args.no_flanking,
+            include_affinity_percentile=not args.no_affinity_percentile,
+            throw=not args.no_throw,
+            affinity_model_kwargs=affinity_model_kwargs,
+            processing_batch_size="auto")
+
+    sequence_items = list(sequences.items())
+    ranges = chunk_ranges_for_local_parallelism(
+        len(sequence_items), args.num_jobs)
+    work_items = []
+    for (chunk_num, start, end) in ranges:
+        work_items.append({
+            "chunk_num": chunk_num,
+            "models_dir": models_dir,
+            "sequences": dict(sequence_items[start:end]),
+            "alleles": alleles,
+            "peptide_lengths": peptide_lengths,
+            "use_flanks": not args.no_flanking,
+            "include_affinity_percentile": (
+                not args.no_affinity_percentile),
+            "throw": not args.no_throw,
+            "affinity_model_kwargs": affinity_model_kwargs,
+            "processing_batch_size": "auto",
+        })
+    results = worker_pool.imap_unordered(
+        _predict_sequences_chunk_worker, work_items, chunksize=1)
+    chunks = [result for result in results]
+    # Restore input sequence order by chunk_num before the global re-sort.
+    chunks.sort(key=lambda chunk: chunk.chunk_num)
+    result_df = pandas.concat(
+        [chunk.predictions for chunk in chunks],
+        ignore_index=True)
+    # Apply the same global sort serial predict_sequences(result="all")
+    # uses (Class1PresentationPredictor.sort_predictions). Each chunk is
+    # sorted only within its sequence subset, so after concat we re-sort
+    # globally. All chunks resolved the same comparison quantity, so we
+    # take it from any of them — keeping parallel output ranking
+    # identical to serial, including the deterministic peptide tie-break.
+    comparison_quantity = chunks[0].comparison_quantity
+    return Class1PresentationPredictor.sort_predictions(
+        result_df, comparison_quantity).reset_index(drop=True)
+
+
 def run(argv=sys.argv[1:]):
     argcomplete.autocomplete(parser)
     if not argv:
@@ -339,7 +539,7 @@ def run(argv=sys.argv[1:]):
         path_size_bytes,
     )
     from ..class1_presentation_predictor import Class1PresentationPredictor
-    from ..fasta import read_fasta_to_dataframe
+    from ..fasta import FastaParser, read_fasta_to_dataframe
 
     # It's hard to pass a tab in a shell, so we correct a common error:
     if args.output_delimiter == "\\t":
@@ -398,29 +598,137 @@ def run(argv=sys.argv[1:]):
         if args.sequences:
             parser.error(
                 "If an input file is specified, do not specify --sequences")
+        input_format = _resolve_input_format(args, parser)
+    else:
+        if not args.sequences:
+            parser.error(
+                "Specify either an input file or the --sequences argument")
+        input_format = None
 
-        input_format = args.input_format
-        if input_format == "guess":
-            parts = args.input.lower().split(".")
-            extension = parts[-1]
-            compression = None
-            if extension in ("gz", "gzip", "bz2", "bzip2") and len(parts) >= 2:
-                compression = extension
-                extension = parts[-2]
-
-            if extension == "csv":
-                input_format = "csv"
-            elif extension in ("fasta", "fa") and compression not in ("bz2", "bzip2"):
-                input_format = "fasta"
-            else:
+    if args.alleles:
+        alleles = {}
+        for i, allele_string in enumerate(args.alleles):
+            parsed = [
+                token for token in re.split(r"[;,\s]+", allele_string.strip())
+                if token
+            ]
+            if not parsed:
                 parser.error(
-                    "Couldn't guess input format from file extension: %s\n"
-                    "Pass the --input-format argument to specify if it is a "
-                    "CSV or fasta file" % args.input)
-            print(
-                "Guessed input file format:", input_format,
-                file=sys.stderr)
+                    "Empty allele specification in --alleles: %r" % (
+                        allele_string,))
+            alleles["genotype_%02d" % i] = parsed
+    else:
+        print(
+            "No alleles specified. Will perform processing prediction only.",
+            file=sys.stderr)
+        alleles = {}
 
+    csv_kwargs = {
+        "index": False,
+        "sep": args.output_delimiter,
+    }
+    if args.float_format is not None:
+        csv_kwargs["float_format"] = args.float_format
+
+    if args.chunk_size is not None:
+        chunk_iter = _iter_sequence_chunks(
+            args, input_format, parser, pandas, FastaParser)
+        first_chunk = next(chunk_iter, None)
+        if first_chunk is None:
+            predictor = _load_predictor_for_command(models_dir)
+            result_df = pandas.DataFrame(
+                columns=predictor.predict_sequences_columns(
+                    alleles=alleles,
+                    use_flanks=not args.no_flanking,
+                    include_affinity_percentile=not args.no_affinity_percentile,
+                ))
+            result_df = _filter_scan_results(
+                result_df, alleles, args, explicit_thresholds, parser)
+            if args.out:
+                try:
+                    result_df.to_csv(args.out, **csv_kwargs)
+                except OSError as error:
+                    parser.error(str(error))
+                print("Wrote: %s" % args.out, file=sys.stderr)
+            else:
+                result_df.to_csv(sys.stdout, **csv_kwargs)
+            return
+
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            workload_name=(
+                WORKLOAD_PRESENTATION_INFERENCE
+                if alleles
+                else WORKLOAD_PROCESSING_INFERENCE
+            ),
+            workload_hints={
+                "data_bytes": path_size_bytes(args.input),
+                "elastic_batch": (
+                    not alleles or default_prediction_batch_is_auto()),
+                "model_bytes": model_artifact_size_bytes(models_dir),
+                "num_rows": args.chunk_size,
+            },
+            start_method="spawn",
+        )
+        affinity_model_kwargs = {}
+        if hasattr(args, "max_workers_per_gpu"):
+            affinity_model_kwargs["num_workers_per_gpu"] = (
+                num_workers_per_gpu_from_args(args)
+            )
+        predictor = None
+        out_fd = None
+        wrote_header = False
+        last_columns = None
+        try:
+            if worker_pool is None:
+                predictor = _load_predictor_for_command(models_dir)
+            for chunk_sequences in itertools.chain([first_chunk], chunk_iter):
+                result_df = _predict_sequence_batch(
+                    sequences=chunk_sequences,
+                    alleles=alleles,
+                    models_dir=models_dir,
+                    peptide_lengths=peptide_lengths,
+                    args=args,
+                    worker_pool=worker_pool,
+                    affinity_model_kwargs=affinity_model_kwargs,
+                    chunk_ranges_for_local_parallelism=chunk_ranges_for_local_parallelism,
+                    Class1PresentationPredictor=Class1PresentationPredictor,
+                    pandas=pandas,
+                    predictor=predictor,
+                )
+                result_df = _filter_scan_results(
+                    result_df, alleles, args, explicit_thresholds, parser)
+                last_columns = list(result_df.columns)
+                if len(result_df) > 0:
+                    if args.out and out_fd is None:
+                        out_fd = open(args.out, "w", newline="")
+                    target = out_fd if args.out else sys.stdout
+                    result_df.to_csv(
+                        target, header=not wrote_header, **csv_kwargs)
+                    wrote_header = True
+            if not wrote_header:
+                empty_df = pandas.DataFrame(columns=last_columns or [])
+                if args.out and out_fd is None:
+                    out_fd = open(args.out, "w", newline="")
+                target = out_fd if args.out else sys.stdout
+                empty_df.to_csv(target, header=True, **csv_kwargs)
+            if worker_pool is not None:
+                worker_pool.close()
+                worker_pool.join()
+                worker_pool = None
+        except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
+            parser.error(str(error))
+        finally:
+            if out_fd is not None:
+                out_fd.close()
+            if worker_pool is not None:
+                worker_pool.terminate()
+                worker_pool.join()
+        if args.out:
+            print("Wrote: %s" % args.out, file=sys.stderr)
+        return
+
+    if args.input:
         if input_format == "csv":
             try:
                 df = pandas.read_csv(
@@ -448,10 +756,6 @@ def run(argv=sys.argv[1:]):
         else:
             parser.error("Unsupported input format: %r" % (input_format,))
     else:
-        if not args.sequences:
-            parser.error(
-                "Specify either an input file or the --sequences argument")
-
         df = pandas.DataFrame({
             args.sequence_column: args.sequences,
         })
@@ -460,24 +764,6 @@ def run(argv=sys.argv[1:]):
         df[args.sequence_id_column] = "sequence_" + df.index.astype(str)
 
     df = df.set_index(args.sequence_id_column)
-
-    if args.alleles:
-        alleles = {}
-        for i, allele_string in enumerate(args.alleles):
-            parsed = [
-                token for token in re.split(r"[;,\s]+", allele_string.strip())
-                if token
-            ]
-            if not parsed:
-                parser.error(
-                    "Empty allele specification in --alleles: %r" % (
-                        allele_string,))
-            alleles["genotype_%02d" % i] = parsed
-    else:
-        print(
-            "No alleles specified. Will perform processing prediction only.",
-            file=sys.stderr)
-        alleles = {}
 
     sequences = df[args.sequence_column].to_dict()
     if not sequences:
@@ -519,112 +805,37 @@ def run(argv=sys.argv[1:]):
             affinity_model_kwargs["num_workers_per_gpu"] = (
                 num_workers_per_gpu_from_args(args)
             )
-        if worker_pool is None:
-            try:
-                predictor = _load_predictor_for_command(models_dir)
-                result_df = predictor.predict_sequences(
-                    sequences=sequences,
-                    alleles=alleles,
-                    result="all",
-                    peptide_lengths=peptide_lengths,
-                    use_flanks=not args.no_flanking,
-                    include_affinity_percentile=not args.no_affinity_percentile,
-                    throw=not args.no_throw,
-                    affinity_model_kwargs=affinity_model_kwargs,
-                    processing_batch_size="auto")
-            except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
-                parser.error(str(error))
-        else:
-            try:
-                # Build the work items inside the try so a failure here still
-                # tears the pool down via the finally rather than leaking
-                # non-daemon workers.
-                sequence_items = list(sequences.items())
-                ranges = chunk_ranges_for_local_parallelism(
-                    len(sequence_items), args.num_jobs)
-                work_items = []
-                for (chunk_num, start, end) in ranges:
-                    work_items.append({
-                        "chunk_num": chunk_num,
-                        "models_dir": models_dir,
-                        "sequences": dict(sequence_items[start:end]),
-                        "alleles": alleles,
-                        "peptide_lengths": peptide_lengths,
-                        "use_flanks": not args.no_flanking,
-                        "include_affinity_percentile": (
-                            not args.no_affinity_percentile),
-                        "throw": not args.no_throw,
-                        "affinity_model_kwargs": affinity_model_kwargs,
-                        "processing_batch_size": "auto",
-                    })
-                results = worker_pool.imap_unordered(
-                    _predict_sequences_chunk_worker, work_items, chunksize=1)
-                chunks = [result for result in results]
+        try:
+            result_df = _predict_sequence_batch(
+                sequences=sequences,
+                alleles=alleles,
+                models_dir=models_dir,
+                peptide_lengths=peptide_lengths,
+                args=args,
+                worker_pool=worker_pool,
+                affinity_model_kwargs=affinity_model_kwargs,
+                chunk_ranges_for_local_parallelism=chunk_ranges_for_local_parallelism,
+                Class1PresentationPredictor=Class1PresentationPredictor,
+                pandas=pandas,
+            )
+            if worker_pool is not None:
                 worker_pool.close()
                 worker_pool.join()
                 worker_pool = None
-            except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
-                parser.error(str(error))
-            finally:
-                # On failure mid-iteration, terminate() rather than
-                # close()/join() (which can hang on a wedged worker) and
-                # leave non-daemon workers behind.
-                if worker_pool is not None:
-                    worker_pool.terminate()
-                    worker_pool.join()
-            # Restore input sequence order by chunk_num before the global
-            # re-sort.
-            chunks.sort(key=lambda chunk: chunk.chunk_num)
-            result_df = pandas.concat(
-                [chunk.predictions for chunk in chunks],
-                ignore_index=True)
-            # Apply the same global sort serial predict_sequences(result="all")
-            # uses (Class1PresentationPredictor.sort_predictions). Each chunk is
-            # sorted only within its sequence subset, so after concat we re-sort
-            # globally. All chunks resolved the same comparison quantity, so we
-            # take it from any of them — keeping parallel output ranking
-            # identical to serial, including the deterministic peptide
-            # tie-break.
-            comparison_quantity = chunks[0].comparison_quantity
-            result_df = Class1PresentationPredictor.sort_predictions(
-                result_df, comparison_quantity).reset_index(drop=True)
+        except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
+            parser.error(str(error))
+        finally:
+            # On failure mid-iteration, terminate() rather than
+            # close()/join() (which can hang on a wedged worker) and
+            # leave non-daemon workers behind.
+            if worker_pool is not None:
+                worker_pool.terminate()
+                worker_pool.join()
 
-    # In processing-only mode (no --alleles), omit the synthetic sample_name
-    # placeholder ("sample1") since no sample was requested (#424).
-    if not alleles and "sample_name" in result_df.columns:
-        result_df = result_df.drop(columns=["sample_name"])
-
-    # Apply thresholds, skipping ones whose column is missing (e.g.
-    # processing-only run with no alleles, or --no-affinity-percentile
-    # leaves affinity_percentile out).
-    threshold_filters = [
-        ("presentation_score", args.threshold_presentation_score, "ge"),
-        ("processing_score", args.threshold_processing_score, "ge"),
-        ("affinity", args.threshold_affinity, "le"),
-        ("affinity_percentile", args.threshold_affinity_percentile, "le"),
-    ]
-    for col, thresh, op in threshold_filters:
-        if thresh is None:
-            continue
-        if col not in result_df.columns:
-            if col in explicit_thresholds:
-                parser.error(
-                    "Cannot apply --threshold-%s: column '%s' is not present "
-                    "in prediction output" % (col.replace("_", "-"), col)
-                )
-            continue
-        if op == "ge":
-            result_df = result_df.loc[result_df[col] >= thresh]
-        else:
-            result_df = result_df.loc[result_df[col] <= thresh]
+    result_df = _filter_scan_results(
+        result_df, alleles, args, explicit_thresholds, parser)
 
     # Write results
-    csv_kwargs = {
-        "index": False,
-        "sep": args.output_delimiter,
-    }
-    if args.float_format is not None:
-        csv_kwargs["float_format"] = args.float_format
     if args.out:
         try:
             result_df.to_csv(args.out, **csv_kwargs)

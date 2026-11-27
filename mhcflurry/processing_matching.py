@@ -35,7 +35,7 @@ def add_processing_matching_args(parser):
                         help="Maximum log10-affinity distance, at most 0.25.")
 
 
-def initialize_matching_artifacts(args):
+def initialize_matching_artifacts(args, sampler=None):
     """Fingerprint the reference and data before generating any matched table."""
     if args.negative_policy == "legacy-top-binders":
         return None
@@ -48,11 +48,26 @@ def initialize_matching_artifacts(args):
     sources = [args.hits, args.proteome_peptides or args.proteome_reference_csv]
     if getattr(args, "exclude_samples_file", None):
         sources.append(args.exclude_samples_file)
+    resolved_sampler = sampler
+    if resolved_sampler is None:
+        resolved_sampler = getattr(args, "sampler", None)
+    if resolved_sampler is None:
+        if getattr(args, "proteome_reference_csv", None):
+            resolved_sampler = "numeric-positions-v1"
+        elif getattr(args, "proteome_peptides", None):
+            resolved_sampler = "precomputed-table-sample-v1"
+        else:
+            resolved_sampler = "unknown"
+    candidate_representation = (
+        "protein-indices-v1" if getattr(args, "proteome_reference_csv", None) else "dataframe"
+    )
     provenance = {"policy": MATCHING_POLICY, "affinity_reference": reference,
                   "decoys_per_hit": args.decoys_per_hit,
                   "max_log10_affinity_distance": args.max_affinity_distance,
                   "candidate_pool_multiplier": args.ppv_multiplier,
                   "seed": getattr(args, "random_seed", None),
+                  "sampler": resolved_sampler,
+                  "candidate_representation": candidate_representation,
                   "inputs": {str(Path(p).resolve()): sha256_file(p) for p in sources}}
     policy_path = directory / "experiment.json"
     if getattr(args, "resume", False):
@@ -73,10 +88,9 @@ def initialize_matching_artifacts(args):
             raise ValueError("Changed processing preparation cache provenance")
     directory.mkdir(parents=True, exist_ok=True)
     if not policy_path.exists():
-        provenance.update(schema_version=2, sampler="numeric-positions-v1")
+        provenance.update(schema_version=2)
         if hasattr(args, "preparation_pipeline_depth"):
             provenance.update(preparation_pipeline_depth=args.preparation_pipeline_depth,
-                candidate_representation="protein-indices-v1" if args.proteome_reference_csv else "dataframe",
                 matching_implementation=MATCHING_POLICY)
         policy_path.write_text(json.dumps(provenance, indent=2) + "\n")
     return reference

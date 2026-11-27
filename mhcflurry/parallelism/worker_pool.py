@@ -630,24 +630,15 @@ def make_worker_pool(
     this feature is to support allocating each worker to a (different) GPU.
 
     IMPLEMENTATION NOTE:
-        The per-worker initializer arguments are implemented using a
-        ``SimpleQueue``. Each worker reads its arguments from this queue when it
-        starts. When it terminates, it adds its initializer arguments back to
-        the queue, so a future process can initialize itself using these
-        arguments. ``SimpleQueue`` is important here: ``Queue.put`` uses a
-        feeder thread, so workers can observe a transiently empty queue during
-        startup and duplicate GPU assignments. A worker that puts its arguments
-        back can also hang forever joining that feeder thread during process
-        finalization.
-
-        There is one issue with this approach, however. If a worker crashes, it
-        never repopulates the queue of initializer arguments. This will prevent
-        any future worker from re-using those arguments. To deal with this
-        issue we add a second 'backup queue'. This queue always contains the
-        full set of initializer arguments: whenever a worker reads from it, it
-        always pushes the pop'd args back to the end of the queue immediately.
-        If the primary arg queue is ever empty, then workers will read
-        from this backup queue.
+        Per-worker initializer arguments are assigned via a shared-memory
+        ``multiprocessing.Array`` of per-slot process IDs plus a monotonic
+        ``multiprocessing.Value`` generation counter passed in ``initargs``.
+        When a worker starts (or restarts under ``max_tasks_per_worker``), it
+        claims a free slot (or one whose previous PID has exited) under the
+        array lock and initializes itself with that slot's kwargs. Using
+        shared-memory slots rather than a ``Queue``/``SimpleQueue`` avoids
+        feeder-thread shutdown hangs and keeps crashed-worker slot recovery
+        deterministic across both ``fork`` and ``spawn`` start methods.
 
     Parameters
     ----------

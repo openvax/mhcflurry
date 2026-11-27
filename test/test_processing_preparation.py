@@ -425,3 +425,78 @@ def test_initialize_resume_is_explicit_and_verifies_source(tmp_path, monkeypatch
     hits.write_text("changed hits")
     with pytest.raises(ValueError, match="Changed"):
         initialize_matching_artifacts(args)
+
+
+def test_provenance_records_explicit_sampler_and_candidate_representation(tmp_path, monkeypatch):
+    """Sampler algorithm and candidate representation are recorded separately (#440)."""
+    import mhcflurry.processing_matching as matching_module
+    from mhcflurry.numeric_proteome import (
+        ProcessingProteome, ProteinWindows, NumericCandidatePool)
+
+    hits_file = tmp_path / "hits.csv"
+    peptides_file = tmp_path / "peptides.csv"
+    hits_file.write_text("hits")
+    peptides_file.write_text("peptides")
+    monkeypatch.setattr(
+        matching_module, "affinity_reference_fingerprint", lambda p: {"sha256": "a" * 64})
+
+    # Precomputed-table input records precomputed-table-sample-v1 + dataframe.
+    table_args = SimpleNamespace(
+        out=str(tmp_path / "table.csv"), negative_policy="matched",
+        max_affinity_distance=.25, decoys_per_hit=1, ppv_multiplier=100,
+        random_seed=42, hits=str(hits_file), proteome_peptides=str(peptides_file),
+        proteome_reference_csv=None, affinity_predictor="reference",
+        resume=False, resume_matching_dir=None)
+    initialize_matching_artifacts(table_args)
+    table_exp = json.loads((tmp_path / "table.csv.matching" / "experiment.json").read_text())
+    assert table_exp["sampler"] == "precomputed-table-sample-v1"
+    assert table_exp["candidate_representation"] == "dataframe"
+
+    # Explicit sampler override is preserved even with proteome_reference_csv.
+    eval_args = SimpleNamespace(
+        out=str(tmp_path / "eval.csv"), negative_policy="matched",
+        max_affinity_distance=.25, decoys_per_hit=1, ppv_multiplier=100,
+        random_seed=42, hits=str(hits_file), proteome_peptides=None,
+        proteome_reference_csv=str(peptides_file), affinity_predictor="reference",
+        resume=False, resume_matching_dir=None)
+    initialize_matching_artifacts(eval_args, sampler="dataframe-positions-v1")
+    eval_exp = json.loads((tmp_path / "eval.csv.matching" / "experiment.json").read_text())
+    assert eval_exp["sampler"] == "dataframe-positions-v1"
+    assert eval_exp["candidate_representation"] == "protein-indices-v1"
+
+    # Round metadata defaults to "unknown" when no sampler is supplied, instead
+    # of falsely labeling arbitrary DataFrame callbacks as "numeric-positions-v1".
+    args, hits, pool = inputs(tmp_path / "unspecified")
+    prepare_sample(args, "s", hits, 42, lambda: pool.copy(), additional, score)
+    round_records = [
+        json.loads(p.read_text())
+        for p in sorted((tmp_path / "unspecified" / "train.csv.matching").glob("*.round-*.json"))
+    ]
+    assert len(round_records) == 2
+    for rec in round_records:
+        assert rec["sampler"] == "unknown"
+        assert rec["candidate_representation"] == "dataframe"
+
+    # Explicit sampler with NumericCandidatePool records both fields accurately.
+    num_args, num_hits, _ = inputs(tmp_path / "numeric")
+    index = ProcessingProteome({"p": "D" * 9 + "E" * 10 + "F" * 9})
+    initial = NumericCandidatePool(num_hits, ProteinWindows(index, [0, 0], [0, 9], [8, 9]), "s", 2)
+
+    def expand_num(length, excluded, seed):
+        return NumericCandidatePool(
+            num_hits.iloc[:0], ProteinWindows(index, [0], [19], [8]), "s", 2)
+
+    def score_num(request):
+        return score(request.prediction_input("cpu").to_strings().tolist())
+
+    prepare_sample(
+        num_args, "s", num_hits, 42, lambda: initial, expand_num, score_num,
+        sampler="numeric-positions-v1")
+    num_records = [
+        json.loads(p.read_text())
+        for p in sorted((tmp_path / "numeric" / "train.csv.matching").glob("*.round-*.json"))
+    ]
+    assert len(num_records) == 2
+    for rec in num_records:
+        assert rec["sampler"] == "numeric-positions-v1"
+        assert rec["candidate_representation"] == "numeric-candidate-pool-v1"
