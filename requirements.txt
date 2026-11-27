@@ -1,3 +1,4 @@
+datacache>=1.37.0,<2
 numpy>=2,<3
 pandas>=3,<4
 torch>=2.0.0
@@ -5,7 +6,7 @@ platformdirs
 scikit-learn
 threadpoolctl
 matplotlib
-mhcgnomes>=3.33.6
+mhcgnomes>=3.87.2
 pyyaml
 tqdm
 argcomplete>=3

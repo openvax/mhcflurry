@@ -15,13 +15,12 @@
 import sys
 import argparse
 import os
-import gzip
 
 import pandas
 
 import gtfparse
 import shellinford
-from Bio import SeqIO
+from mhcflurry.fasta import FastaParser
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -50,19 +49,20 @@ parser.add_argument(
     metavar="FILE.gtf.gz",
     help="Ensembl GTF file")
 
-def run():
-    args = parser.parse_args(sys.argv[1:])
+def run(argv=None):
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
     fm = shellinford.FMIndex()
     df = []
+    reader = FastaParser()
     for f in args.input_paths:
         print("Processing", f)
-        with gzip.open(f, "rt") as fd:
-            records = SeqIO.parse(fd, format='fasta')
-            for (i, record) in enumerate(records):
-                seq = str(record.seq).upper()
-                df.append((record.name, record.description, seq))
-                fm.push_back("$" + seq + "$")  # include sentinels
+        for description, sequence in reader.iterate_over_file(
+                f, full_descriptions=True):
+            record_name = description.split()[0]
+            seq = sequence.upper()
+            df.append((record_name, description, seq))
+            fm.push_back("$" + seq + "$")  # include sentinels
     df = pandas.DataFrame(df, columns=["name", "description", "seq"])
 
     print("Done reading fastas")
