@@ -98,3 +98,29 @@ def test_pyproject_packages_cli_subpackage():
         pyproject["tool"]["setuptools"]["dynamic"]["version"]["attr"]
         == "mhcflurry.version.__version__"
     )
+
+
+def test_requirements_txt_matches_pyproject_dependencies():
+    pyproject_deps = {
+        str(Requirement(spec))
+        for spec in load_pyproject()["project"]["dependencies"]
+    }
+    req_lines = [
+        line.strip()
+        for line in (REPO_DIR / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    req_deps = {str(Requirement(spec)) for spec in req_lines}
+    assert req_deps == pyproject_deps
+
+
+def test_no_biopython_in_runtime_or_downloads_generation():
+    for root in (REPO_DIR / "mhcflurry", REPO_DIR / "downloads-generation"):
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix not in (".py", ".txt"):
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            assert "Bio.SeqIO" not in text, f"Biopython import found in {path}"
+            assert "from Bio " not in text, f"Biopython import found in {path}"
+            if path.name == "requirements.txt":
+                assert "biopython" not in text.lower(), f"biopython listed in {path}"

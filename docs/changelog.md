@@ -8,6 +8,12 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.15](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.15.md)**:
+  Removes Biopython (`#501`): migrates the three remaining `Bio.SeqIO` scripts
+  in `downloads-generation/` to `mhcflurry.fasta.FastaParser`, drops
+  `biopython` from `downloads-generation/data_references/requirements.txt`,
+  syncs `requirements.txt` with `pyproject.toml`, and adds regression tests.
+  Zero changes to runtime prediction code, `2.3.0` weights, or predictions.
 - **[2.5.14](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.14.md)**:
   Repository hygiene and experiment-script organization: deletes 7 dead
   unreferenced one-off campaign scripts and 8 legacy Mount Sinai LSF/TensorFlow

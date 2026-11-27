@@ -12,8 +12,6 @@
 
 """
 Generate allele sequences for pan-class I models.
-
-Additional dependency: biopython
 """
 
 import sys
@@ -22,8 +20,8 @@ import argparse
 import numpy
 import pandas
 
-import Bio.SeqIO  # pylint: disable=import-error
 from mhcflurry.common import normalize_allele_name
+from mhcflurry.fasta import FastaParser
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -48,16 +46,19 @@ parser.add_argument(
 def normalize_allele_name_optional(s):
     return normalize_allele_name(s, raise_on_error=False)
 
-def run():
-    args = parser.parse_args(sys.argv[1:])
+def run(argv=None):
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     print(args)
 
     allele_to_sequence = {}
-    reader = Bio.SeqIO.parse(args.aligned_fasta, "fasta")
-    for record in reader:
-        name = record.description.split()[1]
-        print(record.name, record.description)
-        allele_to_sequence[name] = str(record.seq)
+    reader = FastaParser()
+    for description, sequence in reader.iterate_over_file(
+            args.aligned_fasta, full_descriptions=True):
+        parts = description.split()
+        record_name = parts[0]
+        name = parts[1]
+        print(record_name, description)
+        allele_to_sequence[name] = sequence
 
     print("Read %d aligned sequences" % len(allele_to_sequence))
 
