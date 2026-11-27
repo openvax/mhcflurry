@@ -17,10 +17,30 @@ fixed-size numerical matrices
 from collections import namedtuple
 import logging
 
-from .encodable_sequences import EncodingError, EncodableSequences
+from . import amino_acid
+from .encodable_sequences import EncodingError
 
 import numpy
 import pandas
+
+
+_X_INDEX = numpy.int8(amino_acid.AMINO_ACID_INDEX["X"])
+
+
+def _build_byte_lookup_tables():
+    """Build 256-entry ASCII byte -> amino-acid index lookup tables."""
+    allow = numpy.full(256, _X_INDEX, dtype=numpy.int8)
+    strict = numpy.full(256, -1, dtype=numpy.int8)
+    for ch, idx in amino_acid.AMINO_ACID_INDEX.items():
+        val = numpy.int8(idx)
+        allow[ord(ch.upper())] = val
+        allow[ord(ch.lower())] = val
+        strict[ord(ch.upper())] = val
+        strict[ord(ch.lower())] = val
+    return allow, strict
+
+
+_BYTE_LUT_ALLOW, _BYTE_LUT_STRICT = _build_byte_lookup_tables()
 
 
 EncodingResult = namedtuple(
@@ -202,17 +222,29 @@ class FlankingEncoding(object):
 
         Returns a tuple ``(index_array, peptide_lengths, error_df)``.
         """
-        df = df.reset_index(drop=True).copy()
-        error_df = df.loc[
-            (df.peptide.str.len() > peptide_max_length) |
-            (df.peptide.str.len() < 1)
-        ]
+        df = df.reset_index(drop=True)
+        total_width = n_flank_length + peptide_max_length + c_flank_length
+        n = len(df)
+        if n == 0:
+            return (
+                numpy.empty((0, total_width), dtype=numpy.int8),
+                numpy.empty(0, dtype=numpy.int64),
+                df.iloc[:0],
+            )
+
+        raw_peptides = df["peptide"].tolist()
+        peptide_lengths = numpy.fromiter(
+            (len(p) for p in raw_peptides), dtype=numpy.int64, count=n
+        )
+        invalid_mask = (peptide_lengths > peptide_max_length) | (peptide_lengths < 1)
+        error_df = df.loc[invalid_mask]
         if len(error_df) > 0:
+            first_bad = error_df.iloc[0].peptide
             message = (
                 "Sequence '%s' (length %d) unsupported. %d total "
                 "peptide(s) have unsupported lengths." % (
-                    error_df.iloc[0].peptide,
-                    len(error_df.iloc[0].peptide),
+                    first_bad,
+                    len(first_bad),
                     len(error_df)))
             if throw:
                 raise EncodingError(
@@ -220,33 +252,70 @@ class FlankingEncoding(object):
                     supported_peptide_lengths=(1, peptide_max_length))
             logging.warning(message)
 
-            # Replace invalid peptides with X's. The encoding will be set to
-            # NaNs for these peptides farther below.
-            df.loc[error_df.index, "peptide"] = "X" * peptide_max_length
+            # Replace invalid peptides with X's. The encoding will be masked
+            # via unsupported_mask farther below.
+            placeholder = "X" * peptide_max_length
+            for idx in error_df.index:
+                raw_peptides[idx] = placeholder
+                peptide_lengths[idx] = peptide_max_length
 
-        if n_flank_length > 0:
-            n_flanks = df.n_flank.str.pad(
-                n_flank_length,
-                side="left",
-                fillchar="X").str.slice(-n_flank_length).str.upper()
+        raw_n_flanks = df["n_flank"].tolist() if n_flank_length > 0 else None
+        raw_c_flanks = df["c_flank"].tolist() if c_flank_length > 0 else None
+
+        # Precompute 'X' padding strings of every length up to total_width.
+        x_pads = ["X" * k for k in range(total_width + 1)]
+        rows = [None] * n
+        for i in range(n):
+            p = raw_peptides[i]
+            if n_flank_length > 0:
+                nf = raw_n_flanks[i]
+                nf_len = len(nf)
+                if nf_len >= n_flank_length:
+                    nf_part = nf[-n_flank_length:]
+                else:
+                    nf_part = x_pads[n_flank_length - nf_len] + nf
+            else:
+                nf_part = ""
+            if c_flank_length > 0:
+                cf = raw_c_flanks[i]
+                cf_part = cf[:c_flank_length] if len(cf) > c_flank_length else cf
+            else:
+                cf_part = ""
+            # Matches right_pad of (n_flank_padded + peptide + c_flank_padded):
+            # trailing 'X' padding of c_flank merges directly into right_pad.
+            pad_len = total_width - n_flank_length - len(p) - len(cf_part)
+            rows[i] = nf_part + p + cf_part + x_pads[pad_len]
+
+        lut = _BYTE_LUT_ALLOW if allow_unsupported_amino_acids else _BYTE_LUT_STRICT
+        joined = "".join(rows)
+        try:
+            raw_bytes = joined.encode("ascii")
+        except UnicodeEncodeError:
+            if allow_unsupported_amino_acids:
+                index_map = amino_acid.AMINO_ACID_INDEX
+                fill = int(_X_INDEX)
+                array = numpy.fromiter(
+                    (index_map.get(ch.upper(), fill) for ch in joined),
+                    dtype=numpy.int8,
+                    count=n * total_width,
+                ).reshape(n, total_width)
+            else:
+                index_map = amino_acid.AMINO_ACID_INDEX
+                array = numpy.fromiter(
+                    (index_map[ch.upper()] for ch in joined),
+                    dtype=numpy.int8,
+                    count=n * total_width,
+                ).reshape(n, total_width)
         else:
-            n_flanks = pandas.Series([""] * len(df), dtype=str)
+            buf = numpy.frombuffer(raw_bytes, dtype=numpy.uint8).reshape(n, total_width)
+            array = lut[buf]
+            if not allow_unsupported_amino_acids:
+                bad_mask = array < 0
+                if bad_mask.any():
+                    bad_code = int(buf[bad_mask][0])
+                    raise KeyError(chr(bad_code).upper())
 
-        c_flanks = df.c_flank.str.pad(
-            c_flank_length,
-            side="right",
-            fillchar="X").str.slice(0, c_flank_length).str.upper()
-        peptides = df.peptide.str.upper()
-
-        concatenated = n_flanks + peptides + c_flanks
-
-        encoder = EncodableSequences.create(concatenated.values)
-        array = encoder.variable_length_to_fixed_length_categorical(
-            alignment_method="right_pad",
-            max_length=n_flank_length + peptide_max_length + c_flank_length,
-            allow_unsupported_amino_acids=allow_unsupported_amino_acids)
-
-        return (array, peptides.str.len().values, error_df)
+        return (array, peptide_lengths, error_df)
 
     @staticmethod
     def encode_indices(

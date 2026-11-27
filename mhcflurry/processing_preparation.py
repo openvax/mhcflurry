@@ -186,7 +186,17 @@ class SamplePreparation:
             "round_sha256": [r["sha256"] for r in self.rounds]})
 
 
-def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_candidates):
+def _candidate_representation_name(unscored):
+    """Identify the in-memory candidate container without guessing sampler algorithm."""
+    return (
+        "numeric-candidate-pool-v1"
+        if isinstance(unscored, NumericCandidatePool)
+        else "dataframe"
+    )
+
+
+def sample_preparation_steps(
+        args, sample, hits, seed, initial_pool, additional_candidates, sampler=None):
     """CPU coroutine yielding unscored peptides and receiving affinity scores.
 
     Callbacks keep proteome access and affinity model ownership in the worker.
@@ -194,6 +204,9 @@ def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_
     peptides absent from committed rounds. Each continuation commits its scored
     round before matching, expanding, or publishing sample completion.
     """
+    resolved_sampler = (
+        sampler if sampler is not None else getattr(args, "sampler", None) or "unknown"
+    )
     store = SamplePreparation(args, sample, hits)
     pool = store.load_pool()
     if pool is not None:
@@ -206,10 +219,12 @@ def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_
         started = time.monotonic()
         unscored = initial_pool()
         sampled_at = time.monotonic()
+        representation = _candidate_representation_name(unscored)
         response = yield unscored if isinstance(unscored, NumericCandidatePool) else unscored.peptide
         materializing_at = time.monotonic()
         pool = _scored_frame(unscored, response)
-        store.save_round(pool, {"seed": seed, "sampler": "numeric-positions-v1",
+        store.save_round(pool, {"seed": seed, "sampler": resolved_sampler,
+            "candidate_representation": representation,
             "lengths": sorted(pool.peptide.str.len().unique().tolist()),
             "sampling_seconds": sampled_at - started, "scoring_seconds": response.seconds,
             "materialization_seconds": time.monotonic() - materializing_at,
@@ -267,11 +282,13 @@ def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_
             if not valid_lengths:
                 raise ValueError("Expansion generated an unrelated peptide length")
             sampled_at = time.monotonic()
+            representation = _candidate_representation_name(unscored)
             response = yield unscored if isinstance(unscored, NumericCandidatePool) else unscored.peptide
             materializing_at = time.monotonic()
             additions = _scored_frame(unscored, response)
             store.save_round(additions, {**request, "seeds_by_length": seeds,
-                "sampler": "numeric-positions-v1",
+                "sampler": resolved_sampler,
+                "candidate_representation": representation,
                 "sampling_seconds": sampled_at - failed_at, "scoring_seconds": response.seconds,
                 "materialization_seconds": time.monotonic() - materializing_at,
                 "score_queue_seconds": max(0, materializing_at - sampled_at - response.seconds)})
@@ -284,9 +301,11 @@ def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_
             return result
 
 
-def prepare_sample(args, sample, hits, seed, initial_pool, additional_candidates, score):
+def prepare_sample(
+        args, sample, hits, seed, initial_pool, additional_candidates, score, sampler=None):
     """Synchronous adapter for the same resumable sample workflow."""
-    workflow = sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_candidates)
+    workflow = sample_preparation_steps(
+        args, sample, hits, seed, initial_pool, additional_candidates, sampler=sampler)
     value = None
     try:
         while True:

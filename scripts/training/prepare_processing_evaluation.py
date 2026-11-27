@@ -53,7 +53,9 @@ def expand_sample(args, pool, sequences, score):
             allow_smaller=True).drop_duplicates("peptide")
         return frame.assign(sample_id=sample, hit=0, hla=genotype)
 
-    result = prepare_sample(args, sample, hits, seed, initial, additional, score)
+    result = prepare_sample(
+        args, sample, hits, seed, initial, additional, score,
+        sampler="dataframe-positions-v1")
     verify_hits(pool, result)
     return result
 
@@ -88,6 +90,8 @@ def main(argv=None):
     provenance = {"policy": MATCHING_POLICY, "affinity_reference": args.matching_reference,
                   "decoys_per_hit": args.decoys_per_hit, "max_log10_affinity_distance": 0.25,
                   "candidate_pool_multiplier": None, "seed": args.random_seed, "inputs": inputs,
+                  "sampler": "dataframe-positions-v1",
+                  "candidate_representation": "dataframe",
                   "expansion_candidates_per_length": args.expansion_candidates_per_length,
                   "preparation_script_sha256": sha256_file(__file__)}
     directory = Path(str(args.out) + ".matching")

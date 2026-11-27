@@ -61,6 +61,38 @@ def test_download_entries_use_only_known_keys():
                 assert isinstance(item['size'], int) and item['size'] > 0
 
 
+def test_current_release_retains_unchanged_bundles_and_replaces_model_urls():
+    """Current release stanza must inherit unchanged 2.2.0 entries and replace
+    the three 2.3.0 model bundle URLs with checksummed 2.3.0 assets (#374)."""
+    metadata = downloads.get_downloads_metadata()
+    current_release = metadata['current-release']
+    assert current_release == '2.3.0'
+
+    releases = metadata['releases']
+    previous = {item['name']: item for item in releases['2.2.0']['downloads']}
+    current = {item['name']: item for item in releases[current_release]['downloads']}
+
+    # Every 2.2.0 catalog entry must remain addressable under the current release.
+    missing = set(previous) - set(current)
+    assert not missing, f'Current release {current_release} dropped bundles: {sorted(missing)}'
+
+    replaced_models = {
+        'models_class1_pan',
+        'models_class1_presentation',
+        'models_class1_processing',
+    }
+    for name in replaced_models:
+        entry = current[name]
+        prev_entry = previous[name]
+        assert entry['url'] != prev_entry['url'], f'{name} still points to 2.2.0 URL'
+        assert f'/releases/download/{current_release}/' in entry['url'], (name, entry['url'])
+        assert entry.get('sha256') and entry.get('size', 0) > 0, (name, entry)
+
+    for name in set(previous) - replaced_models:
+        assert current[name] == previous[name], (
+            f'Unchanged bundle {name!r} diverged between 2.2.0 and {current_release}')
+
+
 def test_shared_archive_versions_are_grouped():
     groups = downloads.get_bundle_versions(BUNDLE)
     assert any(item['releases'] == ['2.2.0', '2.0.0'] for item in groups)

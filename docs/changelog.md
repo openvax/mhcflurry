@@ -8,6 +8,16 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.16](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.16.md)**:
+  Reliability, streaming, and performance fixes (`#175`, `#290`, `#374`,
+  `#411`, `#440`): adds streaming `--chunk-size` to `mhcflurry predict-scan`
+  to bound peak memory on large FASTA/CSV scans, speeds up `FlankingEncoding`
+  by `~14x` via a direct 256-entry ASCII byte lookup table with bit-identical
+  output, records explicit `sampler` and separate `candidate_representation`
+  metadata in processing preparation provenance, enforces current download
+  stanza completeness in `test/test_model_catalogue.py`, and aligns the
+  `worker_pool` implementation note with the shared-memory slot-assignment
+  code. Zero changes to `2.3.0` weights or predictions.
 - **[2.5.15](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.15.md)**:
   Removes Biopython (`#501`): migrates the three remaining `Bio.SeqIO` scripts
   in `downloads-generation/` to `mhcflurry.fasta.FastaParser`, drops
