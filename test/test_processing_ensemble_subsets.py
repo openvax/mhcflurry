@@ -14,7 +14,7 @@ from mhcflurry.processing_matching import make_affinity_controlled_risk_sets
 
 
 def module():
-    path = Path(__file__).resolve().parents[1] / "scripts/training/evaluate_processing_subsets.py"
+    path = Path(__file__).resolve().parents[1] / "scripts/experiments/release_2_3_0/evaluate_processing_subsets.py"
     spec = importlib.util.spec_from_file_location("evaluate_processing_subsets", path)
     result = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(result)

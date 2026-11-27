@@ -109,44 +109,12 @@ def derive_seed(master_seed, *parts):
     return int(hashlib.sha1(identity.encode()).hexdigest()[:16], 16)
 
 
-def normalize_allele_name(
+def _parse_class1_allele(
         raw_name,
         forbidden_substrings=("MIC", "HFE"),
         raise_on_error=True,
-        default_value=None,
         use_allele_aliases=True):
-    """
-    Parses a string into a normalized allele representation.
-
-    Parameters
-    ----------
-    raw_name : str
-        Input string to normalize
-
-    forbidden_substrings : tuple of str
-        Legacy argument naming retained for compatibility. Values identify
-        exact genes; ``MIC`` identifies the mhcgnomes class-Ic family. Input
-        names are never rejected by substring matching.
-
-    raise_on_error : bool
-        If an allele fails to parse raise an exception if this argument is True
-
-    default_value : str or None
-        If raise_on_error is False and allele fails to parse, return this value
-
-    use_allele_aliases : bool
-        If True, use mhcgnomes allele alias table (IMGT historical name
-        reassignments). Some old allele names (e.g. B*44:01, Cw*0201) were
-        retired by IMGT when the original sequences were found to contain
-        errors. Defaults to True, so retired/aliased names resolve to their
-        current canonical form. Callers that must preserve current IMGT
-        nomenclature (e.g. pseudosequence-key matching, which is no-alias-first
-        with explicit fallback) pass use_allele_aliases=False.
-
-    Returns
-    -------
-    str or None
-    """
+    """Parse and validate a class-I MHC allele object, or return None."""
     if not isinstance(raw_name, str) or not raw_name.strip():
         message = (
             "Invalid MHC allele name: %r. Expected a non-empty string."
@@ -154,7 +122,7 @@ def normalize_allele_name(
         )
         if raise_on_error:
             raise ValueError(message)
-        return default_value
+        return None
 
     result = parse(
         raw_name,
@@ -203,7 +171,7 @@ def normalize_allele_name(
             )
         if raise_on_error:
             raise ValueError(message)
-        return default_value
+        return None
     gene_name = getattr(result, "gene_name", "") or ""
     gene_class = parse_gene_class(raw_name, raise_on_error=False)
     for forbidden_gene in forbidden_substrings:
@@ -221,7 +189,7 @@ def normalize_allele_name(
                     "affinity models support classical MHC class I alleles, "
                     "not %s-family genes." % (raw_name, forbidden_gene)
                 )
-            return default_value
+            return None
     if getattr(result, "is_pseudogene", False):
         if raise_on_error:
             raise ValueError(
@@ -229,7 +197,7 @@ def normalize_allele_name(
                 "do not have a usable class I product for affinity "
                 "prediction." % raw_name
             )
-        return default_value
+        return None
     if result.annotation_null:
         if raise_on_error:
             raise ValueError(
@@ -237,7 +205,7 @@ def normalize_allele_name(
                 "are not expressed and are not supported for prediction."
                 % raw_name
             )
-        return default_value
+        return None
     if result.annotation_questionable:
         if raise_on_error:
             raise ValueError(
@@ -245,8 +213,57 @@ def normalize_allele_name(
                 "Alleles with uncertain expression are not supported for "
                 "prediction." % raw_name
             )
+        return None
+    return result.restrict_allele_fields(2)
+
+
+def normalize_allele_name(
+        raw_name,
+        forbidden_substrings=("MIC", "HFE"),
+        raise_on_error=True,
+        default_value=None,
+        use_allele_aliases=True):
+    """
+    Parses a string into a normalized allele representation.
+
+    Parameters
+    ----------
+    raw_name : str
+        Input string to normalize
+
+    forbidden_substrings : tuple of str
+        Legacy argument naming retained for compatibility. Values identify
+        exact genes; ``MIC`` identifies the mhcgnomes class-Ic family. Input
+        names are never rejected by substring matching.
+
+    raise_on_error : bool
+        If an allele fails to parse raise an exception if this argument is True
+
+    default_value : str or None
+        If raise_on_error is False and allele fails to parse, return this value
+
+    use_allele_aliases : bool
+        If True, use mhcgnomes allele alias table (IMGT historical name
+        reassignments). Some old allele names (e.g. B*44:01, Cw*0201) were
+        retired by IMGT when the original sequences were found to contain
+        errors. Defaults to True, so retired/aliased names resolve to their
+        current canonical form. Callers that must preserve current IMGT
+        nomenclature (e.g. pseudosequence-key matching, which is no-alias-first
+        with explicit fallback) pass use_allele_aliases=False.
+
+    Returns
+    -------
+    str or None
+    """
+    result = _parse_class1_allele(
+        raw_name,
+        forbidden_substrings=forbidden_substrings,
+        raise_on_error=raise_on_error,
+        use_allele_aliases=use_allele_aliases,
+    )
+    if result is None:
         return default_value
-    return result.restrict_allele_fields(2).to_string()
+    return result.to_string()
 
 
 def normalize_sequence_resolved_allele_name(raw_name):
@@ -256,20 +273,22 @@ def normalize_sequence_resolved_allele_name(raw_name):
     can contain multiple protein sequences. Other species require at least one
     allele field. Sequence-backed accessioned alleles
     (:class:`mhcgnomes.AccessionedAllele`, e.g.
-    ``TriakisScyllium-UAA*uniprot:O46817`` or ``Saha*uniprot:G3V1L5 class I``)
+    ``TriakisScyllium-UAA*uniprot:O46817`` or ``Saha-uniprot:G3V1L5``)
     uniquely identify a protein sequence and are accepted directly. Serotypes,
     genes, class-II names, pseudogenes, and invalid spellings fail through
     :func:`normalize_allele_name` with its specific diagnostic.
     """
-    normalized = normalize_allele_name(raw_name)
-    parsed = parse(normalized, only_class1=True, raise_on_error=False)
+    # Inspect the validated parse result directly rather than re-parsing
+    # normalized.to_string() with only_class1=True (avoids a redundant parse
+    # and handles mhcgnomes 3.92+ gene-less AccessionedAllele serialization;
+    # upstream round-trip tracked in pirl-unc/mhcgnomes#328).
+    parsed = _parse_class1_allele(raw_name, raise_on_error=True)
+    normalized = parsed.to_string()
     if isinstance(parsed, AccessionedAllele):
         return normalized
     species = getattr(parsed, "species", None)
     required_fields = 2 if getattr(species, "mhc_prefix", None) == "HLA" else 1
-    if (
-            parsed is None or
-            len(getattr(parsed, "allele_fields", ())) < required_fields):
+    if len(getattr(parsed, "allele_fields", ())) < required_fields:
         raise ValueError(
             "Expected a sequence-resolved class-I allele with at least %d "
             "field%s; got %r." % (
