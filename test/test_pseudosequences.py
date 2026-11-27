@@ -817,10 +817,8 @@ def test_accessioned_alleles_flow_through_build_and_predictor():
     expected_saha = mhcgnomes.parse(
         "SarcophilusHarrisii*uniprot:G3V1L5 class I"
     ).to_string()
-    assert expected_saha in (
-        "Saha-uniprot:G3V1L5",
-        "Saha*uniprot:G3V1L5 class I",
-    )
+    assert expected_saha.startswith("Saha")
+    assert "uniprot:G3V1L5" in expected_saha
 
     built = build_pseudosequences_from_mhcseqs(rows=rows, normalize_alleles=True)
     assert set(built) == {

@@ -209,15 +209,16 @@ def test_normalize_allele_name_accepts_class1_accessioned_alleles():
     # gene-less Class I alleles while rejecting Class II and forbidden genes.
     import mhcgnomes
 
-    # mhcgnomes 3.92+ shortened gene-less accessioned names from
-    # "Saha*uniprot:G3V1L5 class I" to "Saha-uniprot:G3V1L5".
+    # mhcgnomes canonical string formatting for gene-less AccessionedAllele
+    # evolved across 3.87 ("Saha*uniprot:G3V1L5 class I"), 3.92
+    # ("Saha-uniprot:G3V1L5"), and 3.93+ ("Saha-classI*uniprot:G3V1L5",
+    # pirl-unc/mhcgnomes#328). Assert the semantic prefix/accession and exact
+    # agreement with mhcgnomes.parse(...).to_string().
     expected_saha = mhcgnomes.parse(
         "SarcophilusHarrisii*uniprot:G3V1L5 class I"
     ).to_string()
-    assert expected_saha in (
-        "Saha-uniprot:G3V1L5",
-        "Saha*uniprot:G3V1L5 class I",
-    )
+    assert expected_saha.startswith("Saha")
+    assert "uniprot:G3V1L5" in expected_saha
 
     assert (
         normalize_allele_name("TriakisScyllium-UAA*uniprot:O46817")
