@@ -1,8 +1,10 @@
 # Experiment 2026-11-25: Cross-species `hitlist` validation & `mhcseqs` training parity
 
 **Date:** 2026-11-25
-**Software:** `mhcflurry 2.5.x`, frozen `2.3.0` weights (`models_class1_presentation`), `mhcseqs 2.12.x`, `mhcgnomes 3.77–3.81`
-**Goal:** Quantify (1) vertebrate species expansion from `mhcseqs`, (2) zero-shot Class I Affinity and Presentation (with real species proteome flanks) accuracy on previously unseen species in [`hitlist`](https://github.com/pirl-unc/hitlist) and IEDB, and (3) controlled A/B pan-allele training parity before migrating `downloads-generation/allele_sequences/GENERATE.sh` to `mhcseqs`.
+**Software:** `mhcflurry 2.5.x`, frozen `2.3.0` weights (`models_class1_presentation`), [`mhcseqs`](https://github.com/pirl-unc/mhcseqs) `2.12.x` (curated vertebrate MHC sequence database and structural aligner), [`mhcgnomes`](https://github.com/pirl-unc/mhcgnomes) `3.77–3.81` (cross-species MHC allele-name parser)
+**Goal:** Quantify (1) vertebrate species expansion from `mhcseqs`, (2) zero-shot Class I Affinity and Presentation (with real source-protein flanking sequences) on previously unseen species in [`hitlist`](https://github.com/pirl-unc/hitlist) (an open benchmark corpus of MHC binding and mass-spectrometry elution datasets) and IEDB, and (3) controlled A/B pan-allele training parity before migrating `downloads-generation/allele_sequences/GENERATE.sh` to `mhcseqs`.
+
+*(For a unified plain-English overview with downloadable PDF, see {doc}`whitepaper_25x_cross_species`; for installation and usage recipes, see {doc}`cross_species_validation`.)*
 
 ---
 

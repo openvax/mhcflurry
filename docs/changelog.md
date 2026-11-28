@@ -8,6 +8,18 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.18](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.18.md)**:
+  Documentation clarity and organization pass: links and explains companion
+  packages ([`mhcseqs`](https://github.com/pirl-unc/mhcseqs),
+  [`mhcgnomes`](https://github.com/pirl-unc/mhcgnomes),
+  [`hitlist`](https://github.com/pirl-unc/hitlist)) on first mention, adds a
+  plain-English glossary table to {doc}`whitepaper_25x_cross_species` and its
+  rebuilt companion PDF, refactors {doc}`cross_species_validation` into a
+  concise how-to guide without figure duplication, tucks whitepapers, canine
+  audits, and dated studies under **Advanced topics → Experiment log and
+  whitepapers** ({doc}`experiments`) to keep {doc}`index` focused on everyday
+  usage, and updates the processing fallback note in {doc}`configuration`. Zero
+  changes to code, `2.3.0` weights, or predictions.
 - **[2.5.17](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.17.md)**:
   Publishes the unified MHCflurry 2.5 technical whitepaper
   ({doc}`whitepaper_25x_cross_species`) and its companion typeset vector PDF

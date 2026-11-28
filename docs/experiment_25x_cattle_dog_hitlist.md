@@ -1,13 +1,15 @@
 # Experiment: Audited Cattle BoLA-I & Dog DLA `hitlist` Validation (2.5.x)
 
-*Date: 2026-11-26 · Package: MHCflurry 2.5.x (frozen `2.3.0` presentation weights) · Data: refreshed `hitlist` bundle `2026-11-26` (PXD008151 Cattle BoLA-I + IEDB)*
+*Date: 2026-11-26 · Package: MHCflurry 2.5.x (frozen `2.3.0` presentation weights) · Data: refreshed [`hitlist`](https://github.com/pirl-unc/hitlist) benchmark corpus `2026-11-26` (PXD008151 Cattle BoLA-I + IEDB)*
 
 This experiment evaluates MHCflurry's frozen `2.3.0` Class I Affinity and
-Presentation predictors (with and without real species proteome flanks) on the
-newly expanded Cattle (`Bos taurus`, `BoLA-I`) and Dog
+Presentation predictors (with and without real source-protein flanking
+sequences) on the Cattle (`Bos taurus`, `BoLA-I`) and Dog
 (`Canis lupus familiaris`, `DLA-88`) mass-spectrometry cohorts in the refreshed
 [`hitlist`](https://github.com/pirl-unc/hitlist) corpus, paired with a
-**mandatory three-table `2.3.0` training-overlap audit**.
+**mandatory three-table `2.3.0` training-overlap audit** to separate genuinely
+unseen peptides from in-sample training data. *(See also the unified
+{doc}`whitepaper_25x_cross_species`.)*
 
 ```{figure} _static/release-2.5.13/fig_cattle_dog_hitlist_validation.svg
 :alt: Three-panel Cattle BoLA-I and Dog DLA hitlist audit and validation figure
