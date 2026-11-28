@@ -1,16 +1,17 @@
-# Experiment log
+# Experiment log and whitepapers
 
-Dated empirical studies, cross-species validation campaigns, and controlled
-ablations supporting MHCflurry releases.
+Technical whitepapers, dated validation studies, cross-species benchmarks, and
+controlled ablations supporting MHCflurry releases.
 
 ## 2.5 series — cross-species & pan-class studies
 
 - **{doc}`whitepaper_25x_cross_species`** ([Download PDF](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf)) —
   Unified technical whitepaper synthesizing all three `2.5.x` studies below
-  with 7 publication vector figures, summary tables, and practical guidance.
+  with 7 publication vector figures, summary tables, a plain-English glossary,
+  and practical guidance.
 - {doc}`experiment_25x_cattle_dog_hitlist` *(2026-11-26)* —
-  Training-overlap audit and strictly peptide-disjoint evaluation of Cattle
-  (`BoLA-I`, `21,332` flanked MS ligands) and Dog (`DLA-88`) cohorts from
+  Training-overlap audit and strictly unseen evaluation of Cattle (`BoLA-I`,
+  `21,332` flanked MS ligands) and Dog (`DLA-88`) cohorts from
   [`hitlist`](https://github.com/pirl-unc/hitlist).
 - {doc}`experiment_25x_pan_class_ii` *(2026-11-25)* —
   Exploratory zero-shot test of frozen Class I `2.3.0` weights on 15 Class II
@@ -22,7 +23,7 @@ ablations supporting MHCflurry releases.
   vertebrate species and 3 pocket mutants, plus bit-identical `--lock-existing`
   training parity for [`mhcseqs`](https://github.com/pirl-unc/mhcseqs).
 
-## 2.3 series — model release evaluation
+## 2.3 series — model release evaluation & audits
 
 - {doc}`release_model_evaluation` & {doc}`release_model_evaluation_details` —
   Head-to-head benchmarks of the `2.3.0` PyTorch weights against `2.2.0`,
@@ -41,6 +42,8 @@ sweeps, and historical replays) live in the repository's
 :maxdepth: 1
 :hidden:
 
+whitepaper_25x_cross_species
+dla_validation
 experiment_25x_cattle_dog_hitlist
 experiment_25x_pan_class_ii
 experiment_25x_cross_species_hitlist

@@ -22,16 +22,6 @@ by MHC class I molecules.
 - {doc}`training` — train custom models on your own binding or mass-spectrometry data.
 - {doc}`evaluation` — compare a custom model against a released one.
 
-## Research & validation
-
-- {doc}`whitepaper_25x_cross_species` — unified MHCflurry 2.5 technical whitepaper
-  ([download PDF](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf))
-  covering cross-species Class I accuracy across 223 vertebrate species, audited
-  cattle and dog benchmarks, and an exploratory Class I → Class II test.
-- {doc}`dla_validation` — canine (`DLA`) allele support, training-data overlap audit,
-  and evaluation limits.
-- {doc}`experiments` — individual dated benchmark logs and ablation studies.
-
 ## Reference
 
 - {doc}`commandline_tools` — command-line options for every subcommand.
@@ -45,6 +35,8 @@ by MHC class I molecules.
 - {doc}`shared_percent_rank_transforms` — custom percentile-rank calibration.
 - {doc}`training_provenance` — verify whether evaluation samples overlap a model's
   training data.
+- {doc}`experiments` — experiment log, cross-species technical whitepaper (web
+  & PDF), canine/bovine audits, and dated benchmark studies.
 
 Contributors and release maintainers can start with {doc}`maintainers`.
 
@@ -73,16 +65,6 @@ evaluation
 
 ```{toctree}
 :maxdepth: 2
-:caption: Research & validation
-:hidden:
-
-whitepaper_25x_cross_species
-dla_validation
-experiments
-```
-
-```{toctree}
-:maxdepth: 2
 :caption: Reference
 :hidden:
 
@@ -99,6 +81,7 @@ changelog
 
 shared_percent_rank_transforms
 training_provenance
+experiments
 ```
 
 ```{toctree}
