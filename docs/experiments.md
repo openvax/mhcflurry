@@ -7,8 +7,8 @@ controlled ablations supporting MHCflurry releases.
 
 - **{doc}`whitepaper_25x_cross_species`** ([Download PDF](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf)) —
   Unified technical whitepaper synthesizing all three `2.5.x` studies below
-  with 7 publication vector figures, summary tables, a plain-English glossary,
-  and practical guidance.
+  with 15 standalone single-panel vector figures, summary tables, a
+  plain-English glossary, and practical guidance.
 - {doc}`experiment_25x_cattle_dog_hitlist` *(2026-11-26)* —
   Training-overlap audit and strictly unseen evaluation of Cattle (`BoLA-I`,
   `21,332` flanked MS ligands) and Dog (`DLA-88`) cohorts from

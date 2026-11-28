@@ -1,6 +1,6 @@
 # Whitepaper: Pan-Vertebrate MHC Class I Generalization and Exploratory Pan-Class Transfer in MHCflurry 2.5
 
-> **Companion PDF:** [Download Publication-Ready PDF (vector figures, tables & references)](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf)
+> **Companion PDF:** [Download Publication-Ready PDF (15 standalone vector figures, tables & references)](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf)
 >
 > **Software & Data:** `mhcflurry 2.5.x` · frozen `2.3.0` PyTorch weights (`models_class1_presentation`) · [`mhcseqs`](https://github.com/pirl-unc/mhcseqs) `2.9–2.14` · [`mhcgnomes`](https://github.com/pirl-unc/mhcgnomes) `3.79–3.93` · [`hitlist`](https://github.com/pirl-unc/hitlist) (Nov 2026 bundles), IEDB Class I & II, ProteomeXchange `PXD008151` · **Date:** November 2026
 
@@ -46,13 +46,20 @@ MHCflurry `2.5` adds four capabilities without altering any released `2.3.0` wei
 3. **Sequence-backed naming for non-model species:** Through [`mhcgnomes`](https://github.com/pirl-unc/mhcgnomes) (`AccessionedAllele` support in `mhcflurry >= 2.5.9`), uncurated vertebrate sequences with UniProt accessions (such as shark `TriakisScyllium-UAA*uniprot:O46817` or Tasmanian devil `Saha-classI*uniprot:G3V1L5`) flow cleanly through `normalize_allele_name` and `Class1AffinityPredictor` (`26,156` alleles across `223` canonical vertebrate species, `2,884` accessioned alleles, `0` unparsed rows).
 4. **Zero-regression parity gate:** Across `19,886` overlapping non-`X` alleles in `2.3.0`, `mhcseqs` achieves **`99.45%` exact 39/39 match** (`19,777 / 19,886`) and **`99.98%` per-residue identity** (`775,385 / 775,554`). `downloads-generation/allele_sequences/GENERATE.sh` uses `--lock-existing` plus `verify_trained_allele_parity.py` to enforce `0` character differences across all `308` trained alleles.
 
-Complete Class I coverage expands from `47` species in `2.3.0` to `227` species in `mhcseqs 2.12` (`231` union, `26,549` complete grooves, **`+184` net new vertebrate species** across 14 clades): bony fish `2→53`, birds `1→42`, other mammals `0→28`, reptiles `0→17`, amphibians `0→17`, rodents `2→15`, marsupials `0→7`, sharks & rays `0→4`, bats `0→4`, and cetaceans `0→2`.
+Complete Class I coverage expands from `47` species in `2.3.0` to `227` species in `mhcseqs 2.12` (`231` union, `26,549` complete grooves, **`+184` net new vertebrate species** across 14 clades): bony fish `2→53`, birds `1→42`, other mammals `0→28`, reptiles `0→17`, amphibians `0→17`, rodents `2→15`, marsupials `0→7`, sharks & rays `0→4`, bats `0→4`, and cetaceans `0→2` (`Figure 1`). Experimental validation cohorts across these clades in [`hitlist`](https://github.com/pirl-unc/hitlist) span cellular MS elutions, direct ligands, positive/negative binding assays, and binding-pocket mutants (`Figure 2`).
 
-```{figure} _static/release-2.5.7/fig1_species_and_validation_landscape.svg
-:alt: Taxonomic expansion of complete Class I binding grooves (+184 net new species across 14 vertebrate clades) paired with a heatmap of hitlist Class I validation datasets by species and experimental modality.
-:width: 100%
+```{figure} _static/whitepaper/figures/fig01_taxonomic_expansion.svg
+:alt: Horizontal grouped bar chart comparing distinct vertebrate species with complete Class I grooves in MHCflurry 2.3.0 versus MHCflurry 2.5.x + mhcseqs across 14 vertebrate clades.
+:width: 92%
 
-**Figure 1. Taxonomic expansion of complete Class I grooves and `hitlist` validation data landscape.** *Left:* Distinct vertebrate species with complete Class I grooves in MHCflurry `2.3.0` (`47` species, `10` trained) versus MHCflurry `2.5.x` + `mhcseqs 2.12` (`227` species / `231` union; `+184` net new species across 14 clades). *Right:* Experimental Class I validation data availability in [`hitlist`](https://github.com/pirl-unc/hitlist) by species and modality across 10 unseen vertebrate species, 2 unseen allele/mutant cohorts in trained species, and 2 trained MS reference controls.
+**Figure 1. Taxonomic expansion of complete MHC class I binding grooves across 14 vertebrate clades.** Distinct vertebrate species with complete 39-aa pseudosequences increase from `47` in MHCflurry `2.3.0` (`10` trained) to `227` in `mhcseqs 2.12` (`231` union; `+184` net new vertebrate species), led by bony fish (`+51`), birds (`+41`), other mammals (`+28`), reptiles (`+17`), and amphibians (`+17`).
+```
+
+```{figure} _static/whitepaper/figures/fig02_hitlist_validation_landscape.svg
+:alt: Heatmap of hitlist Class I validation peptide counts by species and experimental modality across 10 unseen vertebrate species, 2 unseen allele/mutant cohorts, and 2 trained reference controls.
+:width: 92%
+
+**Figure 2. `hitlist` Class I validation data availability by species and experimental modality.** Log-scaled peptide counts across four assay types (proteome-flanked cellular MS elutions, direct/unflanked ligands, experimental `+/-` binding assays, and engineered pocket mutants) for `10` unseen vertebrate species, `2` unseen allele/mutant cohorts in trained species, and `2` trained MS reference controls (below dashed line).
 ```
 
 ---
@@ -61,13 +68,20 @@ Complete Class I coverage expands from `47` species in `2.3.0` to `227` species 
 
 ### 2.1 Zero-Shot Presentation (+ Real Proteome Flanks) on Cellular MS Elutions
 
-MHCflurry's presentation model combines pan-allele binding affinity with a human-trained antigen-processing network that examines each peptide and its neighboring source-protein flanking residues. To test whether this human-trained processing model generalizes to distant vertebrates, we took cellular mass-spectrometry (MS) datasets in [`hitlist`](https://github.com/pirl-unc/hitlist) with matched host proteomes (*Sarcophilus harrisii*, *Canis lupus*, *Macaca mulatta*), paired eluted ligands with `10:1` length-matched decoys carrying real flanking sequences from the same host proteome, and scored frozen `2.3.0` weights with zero retraining.
+MHCflurry's presentation model combines pan-allele binding affinity with a human-trained antigen-processing network that examines each peptide and its neighboring source-protein flanking residues. To test whether this human-trained processing model generalizes to distant vertebrates, we took cellular mass-spectrometry (MS) datasets in [`hitlist`](https://github.com/pirl-unc/hitlist) with matched host proteomes (*Sarcophilus harrisii*, *Canis lupus*, *Macaca mulatta*), paired eluted ligands with `10:1` length-matched decoys carrying real flanking sequences from the same host proteome, and scored frozen `2.3.0` weights with zero retraining (`Figures 3 and 4`).
 
-```{figure} _static/release-2.5.7/fig2_hitlist_presentation_vs_affinity.svg
-:alt: Zero-shot Presentation with and without real species proteome flanks versus Affinity and Processing alone on hitlist MS elutions for Tasmanian devil and trained Dog and Rhesus reference alleles.
-:width: 100%
+```{figure} _static/whitepaper/figures/fig03_ms_presentation_auroc.svg
+:alt: Grouped horizontal bar chart comparing AUROC of Presentation with real proteome flanks, Presentation without flanks, Affinity alone, Processing alone, and HLA-A*02:01 negative control on hitlist MS elutions.
+:width: 92%
 
-**Figure 2. Zero-shot Presentation (+ real species proteome flanks) versus Affinity on `hitlist` MS elutions.** AUROC with 95% stratified bootstrap confidence intervals against `10:1` same-proteome length-matched decoys for zero-shot Tasmanian devil (*Sarcophilus harrisii*, `0` training rows, `11` UniProt grooves, `15,301` mapped ligands) alongside trained Dog (`DLA-88`) and Rhesus macaque (`Mamu-B`) MS reference controls.
+**Figure 3. Zero-shot Presentation (+ real species proteome flanks) versus Affinity AUROC on `hitlist` MS elutions.** AUROC with 95% stratified bootstrap confidence intervals against `10:1` same-proteome length-matched decoys for zero-shot Tasmanian devil (*Sarcophilus harrisii*, `0` training rows, `11` UniProt grooves, `15,301` mapped ligands) alongside trained Dog (`DLA-88`) and Rhesus macaque (`Mamu-B`) reference controls. Even across `~160 Myr` to marsupials, MHCflurry's human-trained processing model alone reaches `0.750` AUROC and lifts Presentation from `0.749` to `0.806` (`+0.057`).
+```
+
+```{figure} _static/whitepaper/figures/fig04_ms_presentation_ppv.svg
+:alt: Grouped horizontal bar chart comparing PPV@N precision among top N predictions for Presentation with and without real flanks, Affinity alone, and Processing alone on hitlist MS elutions.
+:width: 92%
+
+**Figure 4. Top-N enrichment gain (`PPV@N`) from human-trained antigen processing on `hitlist` MS elutions.** Precision among the top `N` ranked peptides (dashed line = `0.091` random baseline at `10:1` decoy ratio). Adding human-trained processing and real *S. harrisii* flanks lifts Tasmanian devil `PPV@N` from `0.273` to `0.356` (`+30%` relative enrichment).
 ```
 
 | Dataset (`hitlist` MS) | Status | Mapped Pos (Eval / Total) | Affinity AUROC | Processing (+F) AUROC | Pres (noF) AUROC | **Pres (+ real flanks)** | Δ (Pres+F − Aff) | PPV@N (Aff → Pres+F) |
@@ -79,17 +93,22 @@ MHCflurry's presentation model combines pan-allele binding affinity with a human
 
 *\*As shown in Section 4, IEDB `DLA-88*501:01` overlaps `2.3.0`'s bundled affinity training table; these rows serve strictly as trained positive-control ceilings.*
 
-Even across `~160 Myr` of divergence from placental mammals to marsupials, MHCflurry's human-trained processing model alone achieves **`0.750` AUROC** on Tasmanian devil peptides with real *S. harrisii* flanks and lifts combined Presentation by **`+0.057` AUROC** (`+30%` relative PPV@N).
-
 ### 2.2 Experimental `+/-` Binding Assays & 16-Cohort Zero-Shot Ranking
 
-In-vitro binding assays (refolding, purified-MHC fluorescence screens, and synthetic peptide panels) bypass cellular antigen processing and rarely map to a host proteome (`19 / 448 = 4.2%` in `hitlist/binding.parquet`; `0%` for the `5,607` synthetic random-library `Trvu-UB*01:01` peptides). For these datasets, **Affinity** is the primary metric — evaluated both on measured positive-versus-negative binders (no synthetic decoys) and on `10:1` background ligand ranking, paired with an unrelated human negative control (`HLA-A*02:01`) scored on identical peptides to catch peptide-composition bias.
+In-vitro binding assays (refolding, purified-MHC fluorescence screens, and synthetic peptide panels) bypass cellular antigen processing and rarely map to a host proteome (`19 / 448 = 4.2%` in `hitlist/binding.parquet`; `0%` for the `5,607` synthetic random-library `Trvu-UB*01:01` peptides). For these datasets, **Affinity** is the primary metric — evaluated both on measured positive-versus-negative binders with no synthetic decoys (`Figure 5`) and on `10:1` background ligand ranking (`Figure 6`), paired with an unrelated human negative control (`HLA-A*02:01`) scored on identical peptides to catch peptide-composition bias.
 
-```{figure} _static/release-2.5.7/fig3_hitlist_zeroshot_binding_and_ligands.svg
-:alt: Experimental positive versus negative binding assay AUROC without synthetic decoys and zero-shot Affinity versus Presentation no-flank ligand ranking AUROC across unseen vertebrate species and pocket mutants.
-:width: 100%
+```{figure} _static/whitepaper/figures/fig05_experimental_binding_assays.svg
+:alt: Horizontal bar chart of zero-shot Affinity AUROC on experimental positive-versus-negative binding assays with no synthetic decoys from hitlist/binding.parquet, with HLA-A*02:01 negative control diamonds.
+:width: 92%
 
-**Figure 3. Experimental `+/-` binding assays and broad zero-shot ligand ranking across unseen vertebrates.** *Left:* Experimental positive-versus-negative binding assay AUROC (no synthetic decoys) from `hitlist/binding.parquet`. *Right:* Zero-shot Affinity (solid) and no-flank Presentation (hatched) ligand ranking AUROC against `10:1` length-matched background decoys across 11 unseen vertebrate species and 3 engineered binding-pocket mutants.
+**Figure 5. Zero-shot performance on experimental positive-versus-negative binding assays (no synthetic decoys).** AUROC with 95% bootstrap CI on curated measured binders vs. measured non-binders from `hitlist/binding.parquet`, colored by clade, alongside the `HLA-A*02:01` negative control (black diamonds). Strongest separation appears on Cynomolgus `Mafa-A1*063:01` (`0.89` vs. `0.16` control) and Brushtail possum `Trvu-UB*01:01` (`0.66`), while tiny single-mutant negative panels (`3+/13-` cat, `6+/10-` horse) have wide intervals.
+```
+
+```{figure} _static/whitepaper/figures/fig06_zeroshot_ligand_ranking.svg
+:alt: Horizontal bar chart of zero-shot Affinity (solid) and no-flank Presentation (hatched) ligand ranking AUROC against 10:1 length-matched background decoys across 11 unseen vertebrate species and 3 binding-pocket mutants.
+:width: 96%
+
+**Figure 6. Zero-shot Affinity and no-flank Presentation ligand ranking across 11 unseen vertebrate species and 3 pocket mutants.** Solid bars show zero-shot Affinity AUROC (95% CI); hatched bars show no-flank Presentation AUROC; black diamonds mark the `HLA-A*02:01` negative control on identical peptides. Asterisks (`*`) indicate alleles carrying internal groove insertions or deletions flagged by `mhcseqs`.
 ```
 
 | Unseen Species / Allele (Clade) | Validation Data Available | Ligand Ranking AUROC: Aff / Pres (noF) | `HLA-A*02:01` Ctrl | Exp. `+/-` Binding AUROC *(no decoys)* | Notes / Caveats |
@@ -117,31 +136,38 @@ In-vitro binding assays (refolding, purified-MHC fluorescence screens, and synth
 
 ### 3.1 Negative-Control Separation & Empirical vs Zero-Shot Sequence Logos
 
-Comparing each unseen cohort against the `HLA-A*02:01` negative control (`Figure 4`, left) separates true allele-specific transfer (`+0.356` horse, `+0.341` cat `FLA-E*018:01`, `+0.329` duck `Anpl-UAA*76`, `+0.299` possum) from peptide-composition artifacts (`Xela-UAAg` frog: `0.826` vs `0.810` control).
+Comparing each unseen cohort against the `HLA-A*02:01` negative control (`Figure 7`) separates true allele-specific transfer (`+0.36` horse, `+0.34` cat `FLA-E*018:01`, `+0.33` duck `Anpl-UAA*76`, `+0.30` possum) from peptide-composition artifacts (`Xela-UAAg` frog: `0.83` vs `0.81` control).
 
-```{figure} _static/release-2.5.8/fig4_zeroshot_vs_control_and_parity.svg
-:alt: Groove-specific zero-shot transfer compared to an HLA-A*02:01 negative control across all 16 unseen-species and mutant cohorts, paired with the controlled A/B pan-allele training parity comparison.
-:width: 100%
+```{figure} _static/whitepaper/figures/fig07_groove_specificity_vs_control.svg
+:alt: Dumbbell plot comparing zero-shot target-groove AUROC against an HLA-A*02:01 negative control on identical peptides across all 16 unseen-species and binding-pocket mutant cohorts.
+:width: 96%
 
-**Figure 4. Groove-specific transfer across 16 unseen cohorts and controlled A/B pan-allele training parity.** *Left:* Zero-shot target-groove AUROC versus `HLA-A*02:01` negative control on identical peptides across all 16 unseen-species and pocket-mutant datasets, sorted by `Δ = Target − Control`. *Right:* Controlled A/B pan-allele training parity across all `307` trained `2.3.0` alleles comparing legacy `clustalo` (Arm A) against `mhcseqs --lock-existing` (Arm B: `Max |Δ| = 0.0`, `r = 1.000000`) and unlocked `Gaga-BF` resolution (Arm C).
+**Figure 7. Groove-specific zero-shot transfer versus `HLA-A*02:01` negative control across all 16 unseen cohorts.** Colored circles mark target-allele zero-shot AUROC; black diamonds mark the `HLA-A*02:01` negative control on identical peptides, sorted by margin `Δ = Target − Control`. Thirteen of sixteen cohorts outperform the control, while deeply diverged frog `Xela-UAAg` ties the control (warning of composition bias).
 ```
 
-Comparing experimentally observed 9-mer ligands against the top 1% of `30,000` random 9-mers scored zero-shot (`Figure 5`) shows both why pan-allele transfer works and where fixed 39-aa pseudosequences reach their limit:
+Comparing experimentally observed 9-mer ligands against the top 1% of `30,000` random 9-mers scored zero-shot (`Figure 8`) shows both why pan-allele transfer works and where fixed 39-aa pseudosequences reach their limit:
 
 - **Feline & marsupial anchor recovery:** With zero feline training data, `FLA-E*003:01` recovers both its empirical position-2 proline (`P2-Pro`) and position-9 basic (`P9-Arg/Lys`) preferences; brushtail possum `Trvu-UB*01:01` and Tasmanian devil `Saha` recover their aromatic/hydrophobic C-terminal (`P9`) anchors across `~160 Myr`.
 - **Single-residue pocket mutants:** Extracting mature-numbered point mutations via `mhcseqs` improves discrimination over the corresponding wild-type allele on mutant-specific ligands for both Pig `SLA-1*04:01 R156A` (`ΔAUROC = +0.010`, 95% CI `[+0.007, +0.013]`) and Cat `FLA-E*018:01 W167S` (`ΔAUROC = +0.006`, 95% CI `[+0.000, +0.015]`).
 - **Honest failure mode — Bat `Ptal-N*01:01` (3-aa `MDL` insertion):** This bat allele carries three extra amino acids (`MDL`) inserted at position 51 inside the N-terminal binding pocket (the A-pocket), reshaping its preference toward `P1-Asp` and `P9-Pro`. Because a fixed 39-position pseudosequence must skip those three inserted residues, predicted affinities flatten to `~26–30 µM` (`1.1×` separation). `mhcseqs >= 2.9` automatically flags such groove insertions with a warning.
 
-```{figure} _static/release-2.5.0/zero_shot_motifs.svg
+```{figure} _static/whitepaper/figures/fig08_zero_shot_motifs.svg
 :alt: Empirical versus zero-shot predicted 9-mer information-content sequence logos for Brushtail possum Trvu-UB*01:01, Cat FLA-E*003:01, Tasmanian devil Saha, and Bat Ptal-N*01:01.
 :width: 100%
 
-**Figure 5. Empirical versus zero-shot predicted 9-mer sequence logos.** Observed 9-mer ligands (top row) compared against the top 1% zero-shot predicted 9-mers from `30,000` random background peptides (bottom row) for Brushtail possum `Trvu-UB*01:01`, Cat `FLA-E*003:01`, Tasmanian devil `Saha`, and the Bat `Ptal-N*01:01` insertion failure mode.
+**Figure 8. Empirical versus zero-shot predicted 9-mer sequence logos.** Observed 9-mer ligands (top row) compared against the top 1% zero-shot predicted 9-mers from `30,000` random background peptides (bottom row) for Brushtail possum `Trvu-UB*01:01`, Cat `FLA-E*003:01`, Tasmanian devil `Saha`, and the Bat `Ptal-N*01:01` 3-aa insertion failure mode.
 ```
 
 ### 3.2 Controlled A/B Pan-Allele Training Parity
 
-In a controlled A/B pan-allele training run (`[1024, 1024]` architecture, `30,760` train / `7,690` held-out test across all trained alleles, seed `42`), `--lock-existing` reproduces legacy `clustalo` training bit-for-bit while adding all `+184` net new vertebrate species:
+In a controlled A/B pan-allele training run (`[1024, 1024]` architecture, `30,760` train / `7,690` held-out test across all `307` trained alleles, seed `42`), `--lock-existing` reproduces legacy `clustalo` training bit-for-bit while adding all `+184` net new vertebrate species (`Figure 9`).
+
+```{figure} _static/whitepaper/figures/fig09_training_parity.svg
+:alt: Grouped bar chart comparing controlled A/B pan-allele training arms (Legacy clustalo, mhcseqs with --lock-existing, and unlocked mhcseqs prefer_existing) on held-out AUROC and Pearson correlation.
+:width: 82%
+
+**Figure 9. Controlled A/B pan-allele training parity across all 307 trained `2.3.0` alleles.** Locking existing alleles verbatim (`Arm B: mhcseqs + --lock-existing`) reproduces legacy `clustalo` training (`Arm A`) bit-for-bit (`Max |Δ| = 0.0`, `log10 r = 1.000000`, `AUROC = 0.80169`) while expanding the table by `+184` vertebrate species.
+```
 
 | Arm | Pseudosequence Table | Held-out AUROC (all) | Chicken `Gaga` AUROC | Max `|Δ|` vs Arm A | `log10 r` vs Arm A |
 | :--- | :--- | ---: | ---: | ---: | ---: |
@@ -153,13 +179,27 @@ In a controlled A/B pan-allele training run (`[1024, 1024]` architecture, `30,76
 
 ## 4. Audited Livestock & Companion-Animal Validation: Cattle `BoLA-I` & Dog `DLA-88`
 
-Checking only `curated_training_data.affinity.csv.bz2` misses mass-spectrometry ligands that were folded into the training tables shipped inside `models_class1_presentation/models/`. Auditing all three bundled `2.3.0` training tables (`affinity_predictor_train_data.csv.bz2`: `811,134` rows; `processing_predictor_with_flanks_train_data.csv.bz2`: `399,392` rows; `processing_predictor_no_flank_train_data.csv.bz2`: `399,392` rows) cleanly separates in-sample training data from genuinely unseen peptides (`Figure 6`).
+Checking only `curated_training_data.affinity.csv.bz2` misses mass-spectrometry ligands that were folded into the training tables shipped inside `models_class1_presentation/models/`. Auditing all three bundled `2.3.0` training tables (`affinity_predictor_train_data.csv.bz2`: `811,134` rows; `processing_predictor_with_flanks_train_data.csv.bz2`: `399,392` rows; `processing_predictor_no_flank_train_data.csv.bz2`: `399,392` rows) cleanly separates in-sample training data from genuinely unseen peptides (`Figure 10`), confirms strong Presentation (+F) ranking on `21,332` strictly unseen Cattle `BoLA-I` ligands (`Figure 11`), and quantifies ultra-few-shot transfer down to `4–12` training rows (`Figure 12`).
 
-```{figure} _static/release-2.5.13/fig_cattle_dog_hitlist_validation.svg
-:alt: Three-panel Cattle BoLA-I and Dog DLA hitlist audit and validation figure.
+```{figure} _static/whitepaper/figures/fig10_cattle_dog_overlap_audit.svg
+:alt: Stacked horizontal bar chart showing exact peptide overlap of Cattle BoLA-I and Dog DLA-88 hitlist cohorts against all three bundled 2.3.0 training tables.
 :width: 100%
 
-**Figure 6. Mandatory three-table overlap audit and strictly unseen Cattle `BoLA-I` / Dog `DLA-88` validation.** **A.** Exact peptide overlap against all three bundled `2.3.0` training tables: every `hitlist` Dog `DLA-88` MS peptide and small IEDB Cattle `BoLA-I` cohort (PMID 36423003) is `100%` in-sample and excluded from held-out claims, whereas `79.5%–87.3%` (`21,606` unique; `21,332` flanked) of `PXD008151` Cattle `BoLA-I` have zero sequence overlap with any `2.3.0` training table. **B.** Unseen `PXD008151` `BoLA-I` ranking against `10×` unseen *Bos taurus* proteome decoys with real 5-aa flanks. **C.** Ultra-few-shot `BoLA` allele ablation (`4–12` training rows).
+**Figure 10. Mandatory three-table `2.3.0` training-overlap audit for Cattle `BoLA-I` and Dog `DLA-88`.** Every `hitlist` Dog `DLA-88` MS peptide and small IEDB Cattle `BoLA-I` cohort (PMID 36423003) is `100%` in-sample in `affinity_predictor_train_data.csv.bz2` and excluded from held-out claims, whereas `79.5%–87.3%` (`21,606` unique; `21,332` flanked) of `PXD008151` Cattle `BoLA-I` ligands have zero overlap with any of the three bundled `2.3.0` training tables.
+```
+
+```{figure} _static/whitepaper/figures/fig11_cattle_bola_disjoint_auroc.svg
+:alt: Grouped bar chart of ligand-ranking AUROC on strictly unseen PXD008151 Cattle BoLA-I cohorts comparing HLA-A*02:01 control, Affinity, Presentation without flanks, and Presentation with real Bos taurus flanks.
+:width: 88%
+
+**Figure 11. Strictly unseen `PXD008151` Cattle `BoLA-I` ligand ranking (+ real *Bos taurus* flanks).** Evaluated on `2,500` strictly unseen flanked ligands per cohort against `25,000` (`10×`) unseen bovine proteome decoys with symmetric real 5-aa flanks. All three cohorts reach `0.902–0.960` Presentation (+F) AUROC, beating the `HLA-A*02:01` control by `+0.171` to `+0.290` AUROC.
+```
+
+```{figure} _static/whitepaper/figures/fig12_cattle_bola_fewshot_ablation.svg
+:alt: Grouped bar chart ablating ultra-few-shot Cattle BoLA alleles (4 to 12 training rows) on strictly unseen bovine ligands.
+:width: 86%
+
+**Figure 12. Ultra-few-shot Cattle `BoLA-I` allele ablation (`4–12` training rows).** Adding `BoLA-3*002:01` (only `12` training rows in `2.3.0`) lifts the 2-allele haplotype by `+0.029` Presentation (+F) AUROC (`+0.041` Affinity) and captures `42.8%` of unseen bovine ligands as top binder; `BoLA-4*024:01` (`6` training rows) reaches `0.904` Presentation (+F) AUROC alone, and `BoLA-2*025:01` (`4` training rows) reaches `0.850`.
 ```
 
 | Cohort (Source) | 2.3.0 Bundled Train Rows | Strictly Unseen (%) | Aff AUROC | Pres (noF) AUROC | **Pres (+F) AUROC** | `HLA-A*02:01` Ctrl | PPV@N (`noF → +F`) |
@@ -171,21 +211,33 @@ Checking only `curated_training_data.affinity.csv.bz2` misses mass-spectrometry 
 | Dog `DLA-88*501:01` (IEDB PMID 27893789) | `1,963` | 0 (0.0%) | — | — | *Excluded (`100%` in-sample; `#490`)* | — | — |
 | Dog `DLA-88*508:01` (IEDB PMID 29475511) | `96` | 0 (0.0%) | — | — | *Excluded (`100%` in-sample; `#490`)* | — | — |
 
-In ultra-few-shot haplotype ablations (`Figure 6C`), adding `BoLA-3*002:01` (only `12` training rows in `2.3.0`) lifts the 2-allele haplotype by `+0.041` Affinity AUROC (`+0.029` Presentation +F) and captures `42.8%` of unseen bovine ligands as top binder; `BoLA-4*024:01` (only `6` training rows) reaches `0.904` Presentation (+F) AUROC on its own, and `BoLA-2*025:01` (`4` training rows) reaches `0.850`.
-
 ---
 
 ## 5. Exploratory Boundary Study: Zero-Shot Class I → Class II Transfer
 
 MHC class I (one heavy chain forming both halves of the binding groove) and MHC class II (separate `α` and `β` chains each contributing one half) share the same overall 3D protein fold. Using [`mhcseqs`](https://github.com/pirl-unc/mhcseqs)'s structural IMGT alignment, we mapped MHCflurry's 39 Class I contact positions directly onto their structurally equivalent positions in Class II `HLA-DR`, `HLA-DQ`, and `HLA-DP` heterodimers (`36 / 39` positions directly populated; `3` Class I-only positions padded with `X`).
 
-We tested whether these aligned 39-aa Class II pseudosequences allow **frozen Class I MHCflurry `2.3.0` weights** to predict quantitative Class II 15-mer binding affinity zero-shot across `15` HLA-DR/DQ/DP alleles (`500` unique 15-mers per allele; `7,500` total IC50 nM pairs from [`hitlist`](https://github.com/pirl-unc/hitlist); binder threshold `IC50 ≤ 500 nM`), benchmarked against `NetMHCIIpan-4.3` (BA & EL) and an unrelated `HLA-A*02:01` negative control in both **9-mer core scanning** (best predicted affinity across the 7 overlapping 9-mer substrings) and **direct 15-mer** scoring (`Figure 7`).
+We tested whether these aligned 39-aa Class II pseudosequences allow **frozen Class I MHCflurry `2.3.0` weights** to predict quantitative Class II 15-mer binding affinity zero-shot across `15` HLA-DR/DQ/DP alleles (`500` unique 15-mers per allele; `7,500` total IC50 nM pairs from [`hitlist`](https://github.com/pirl-unc/hitlist); binder threshold `IC50 ≤ 500 nM`), benchmarked against `NetMHCIIpan-4.3` (BA & EL) and an unrelated `HLA-A*02:01` negative control in both **9-mer core scanning** (best predicted affinity across the 7 overlapping 9-mer substrings) and **direct 15-mer** scoring (`Figures 13–15`).
 
-```{figure} _static/release-2.5.9/fig_pan_class_ii_experiment.svg
-:alt: Three-panel benchmark comparing NetMHCIIpan-4.3 BA against frozen Class I MHCflurry 2.3 using mhcseqs pan-class IMGT 39-aa Class II pseudosequences (9-mer core and direct 15-mer) and an HLA-A*02:01 negative control across 15 HLA-DR, DQ, and DP alleles, plus the 15x15 cross-allele specificity matrix.
-:width: 100%
+```{figure} _static/whitepaper/figures/fig13_class_ii_auroc.svg
+:alt: Horizontal grouped bar chart comparing per-allele Class II AUROC (IC50 <= 500 nM) for NetMHCIIpan-4.3 BA, frozen Class I MHCflurry 9-mer core, direct 15-mer, and HLA-A*02:01 negative control across 15 HLA-DR, DQ, and DP alleles.
+:width: 92%
 
-**Figure 7. Exploratory zero-shot Class I → Class II pan-class transfer versus `NetMHCIIpan-4.3`.** **A, B.** Per-allele AUROC (`IC50 ≤ 500 nM`) and continuous Spearman rank correlation (`ρ` against `-log10 IC50`) across 15 HLA-DR, DQ, and DP alleles (`500` 15-mers each). **C.** `15 × 15` cross-allele specificity matrix (AUROC minus row mean under pan-class 9-mer core scoring), displaying column-dominated vertical bands rather than diagonal allele specificity (`mean diag 0.551` vs `mean off-diag 0.556`, `Δ = -0.005`).
+**Figure 13. Exploratory zero-shot Class I → Class II AUROC across 15 HLA-DR, DQ, and DP alleles.** Binary binder classification AUROC (`IC50 ≤ 500 nM`, `500` 15-mers per allele). Frozen Class I MHCflurry `2.3.0` with pan-class 9-mer core scanning averages `0.551` AUROC — below the unrelated `HLA-A*02:01` negative control (`0.598`) and far below native `NetMHCIIpan-4.3 BA` (`0.923`). Direct 15-mer scoring drops to `0.235–0.255` on HLA-DP.
+```
+
+```{figure} _static/whitepaper/figures/fig14_class_ii_spearman.svg
+:alt: Horizontal grouped bar chart comparing continuous Spearman rank correlation against experimental -log10(IC50) across 15 HLA-DR, DQ, and DP alleles.
+:width: 92%
+
+**Figure 14. Quantitative Class II 15-mer IC50 rank correlation (`Spearman ρ`) across 15 alleles.** Continuous rank correlation against experimental `-log10(IC50)`. Native `NetMHCIIpan-4.3 BA` achieves mean `ρ = +0.801`, whereas frozen Class I 9-mer core scanning achieves `+0.115` (below `HLA-A*02:01` at `+0.187`) and direct 15-mer scoring is systematically anti-correlated (`ρ = -0.224`, down to `-0.521` on `DPA1*01:03/DPB1*04:01`).
+```
+
+```{figure} _static/whitepaper/figures/fig15_class_ii_specificity_matrix.svg
+:alt: 15x15 cross-allele specificity heatmap showing row-centered AUROC differences when scoring each Class II allele test set with every other Class II pseudosequence on frozen Class I weights.
+:width: 78%
+
+**Figure 15. `15 × 15` Class I → Class II cross-allele specificity matrix.** Row-centered AUROC (`AUROC − row mean`) when scoring each true Class II allele test set (rows) with each pan-class Class II pseudosequence (columns) using frozen Class I weights. Strong vertical column stripes rather than a bright diagonal (`mean diag 0.551` vs `mean off-diag 0.556`, `Δ = -0.005`) confirm zero Class II groove specificity.
 ```
 
 | Method | Scoring mode | Mean AUROC (`≤ 500 nM`) | Mean Spearman `ρ` (`-log10 IC50`) | Interpretation |
@@ -203,7 +255,7 @@ We tested whether these aligned 39-aa Class II pseudosequences allow **frozen Cl
 
 1. **9-mer core scanning picks up generic hydrophobicity, not Class II allele specificity:** Scanning 9-mer cores lifts AUROC from `0.394` to `0.551` only because Class II binders tend to contain hydrophobic internal 9-mer cores that Class I models also prefer — yet the unrelated `HLA-A*02:01` negative control scores *higher* (`0.598`) on the exact same peptides.
 2. **Closed-groove vs. open-groove geometry causes strong anti-correlation on HLA-DP (`0.235–0.255`, `ρ = -0.40 to -0.52`):** MHC class I binds 15-mers in a *closed* pocket by pinning both peptide ends and bulging the middle out, whereas MHC class II binds an *open* groove where the 9-mer core sits anywhere inside the peptide with polar/charged ends overhanging freely.
-3. **Zero diagonal specificity proves joint training is required:** In `Figure 7C`, matching the right Class II pseudosequence (`0.551`) performs slightly *worse* than mismatched Class II alleles (`0.556`, `Δ = -0.005`). While `mhcseqs` provides a clean shared structural alignment across both MHC classes, predicting Class II accurately requires training a future architecture **jointly** on both Class I and Class II data.
+3. **Zero diagonal specificity proves joint training is required:** In `Figure 15`, matching the right Class II pseudosequence (`0.551`) performs slightly *worse* than mismatched Class II alleles (`0.556`, `Δ = -0.005`). While `mhcseqs` provides a clean shared structural alignment across both MHC classes, predicting Class II accurately requires training a future architecture **jointly** on both Class I and Class II data.
 
 ---
 
