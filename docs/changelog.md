@@ -8,6 +8,19 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.19](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.19.md)**:
+  Simpler everyday documentation and upgraded scientific negative controls in
+  the cross-species whitepaper: adds two plain-English user guides
+  ({doc}`interpreting_predictions` and {doc}`scanning_proteins`), moves
+  {doc}`cross_species_validation`, {doc}`training`, {doc}`evaluation`, and
+  {doc}`release_model_evaluation` under **Advanced topics**, trims
+  {doc}`orchestrator` from 441 lines to a concise 68-line contributor reference
+  nested (with {doc}`auto_sizing_audit`) under {doc}`maintainers`, and replaces
+  the single `HLA-A*02:01` baseline in {doc}`whitepaper_25x_cross_species` and
+  its 16-figure PDF with 50-allele mismatched real-allele null distributions,
+  30-groove column-permuted pseudosequences, and within-peptide
+  residue-scrambled positive controls. Zero changes to runtime code, `2.3.0`
+  weights, or predictions.
 - **[2.5.18](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.18.md)**:
   Documentation clarity and organization pass: links and explains companion
   packages ([`mhcseqs`](https://github.com/pirl-unc/mhcseqs),

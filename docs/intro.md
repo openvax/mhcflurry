@@ -74,15 +74,17 @@ list represents one MHC allele set and reports its strongest-binding allele. See
 
 ## Where to go next
 
-1. {doc}`commandline_tutorial` or {doc}`python_tutorial`: the full prediction
-   workflow, including protein scanning.
-2. {doc}`release_model_evaluation`: how the released models compare with other
-   predictors.
-3. {doc}`model_downloads`: other weight releases, if you need to reproduce an
+1. {doc}`commandline_tutorial` or {doc}`python_tutorial`: walk through the full
+   prediction workflow.
+2. {doc}`interpreting_predictions`: what each score means, which column to rank
+   by, and practical cutoffs.
+3. {doc}`scanning_proteins`: scanning protein FASTA files and whole proteomes.
+4. {doc}`model_downloads`: other weight releases, if you need to reproduce an
    older analysis.
 
-If you have your own measurements, {doc}`training` and {doc}`evaluation` cover
-fitting and validating custom models.
+For non-model species, model benchmarks, or training custom models on your own
+measurements, see **Advanced topics** ({doc}`cross_species_validation`,
+{doc}`training`, {doc}`evaluation`).
 
 (using-conda)=
 
