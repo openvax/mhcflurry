@@ -118,6 +118,7 @@ Full documentation: [openvax.github.io/mhcflurry](https://openvax.github.io/mhcf
 - [Docker](https://openvax.github.io/mhcflurry/docker.html): published images, notebooks, and building your own
 - [Model weights and older releases](https://openvax.github.io/mhcflurry/model_downloads.html): browse weights with `mhcflurry downloads info` and select one with `--model-release`
 - [Evaluation of the 2.3.0 weights](https://openvax.github.io/mhcflurry/release_model_evaluation.html) and [training your own models](https://openvax.github.io/mhcflurry/training.html)
+- [MHCflurry 2.5 Pan-Vertebrate Whitepaper](https://openvax.github.io/mhcflurry/whitepaper_25x_cross_species.html) ([PDF](https://openvax.github.io/mhcflurry/_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf)): zero-shot Class I affinity & presentation across 223 species, audited Cattle/Dog benchmarks, and exploratory Class I → Class II transfer
 - [Command reference](https://openvax.github.io/mhcflurry/commandline_tools.html) and [API reference](https://openvax.github.io/mhcflurry/api.html)
 - [Predicted binding motifs](https://openvax.github.io/mhcflurry-motifs/)
 

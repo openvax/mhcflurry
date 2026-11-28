@@ -8,6 +8,18 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.17](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.17.md)**:
+  Publishes the unified MHCflurry 2.5 technical whitepaper
+  ({doc}`whitepaper_25x_cross_species`) and its companion typeset vector PDF
+  (`mhcflurry_25x_cross_species_whitepaper.pdf`, generated reproducibly via
+  `docs/build_whitepaper_pdf.py`) synthesizing all `2.5.x` cross-species Class I
+  affinity/presentation benchmarks, audited Cattle `BoLA-I` / Dog `DLA-88`
+  validation, training parity, and exploratory Class I → Class II transfer
+  studies; updates `.github/workflows/docker.yml` and {doc}`docker` to publish
+  multi-platform `amd64`/`arm64` images automatically to
+  `ghcr.io/openvax/mhcflurry` while gating Docker Hub push on credentials
+  (`#498`, `#467`). Zero changes to runtime code, `2.3.0` weights, or
+  predictions.
 - **[2.5.16](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.16.md)**:
   Reliability, streaming, and performance fixes (`#175`, `#290`, `#374`,
   `#411`, `#440`): adds streaming `--chunk-size` to `mhcflurry predict-scan`

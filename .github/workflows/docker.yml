@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: docker-${{ github.event.release.tag_name || inputs.tag || github.ref }}
@@ -32,6 +33,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     outputs:
       version: ${{ steps.version.outputs.version }}
+      ghcr_image: ${{ steps.version.outputs.ghcr_image }}
+      has_dockerhub: ${{ steps.dockerhub.outputs.configured }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -41,15 +44,31 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           VERSION=$(python -c 'exec(open("mhcflurry/version.py").read()); print(__version__)')
+          GHCR_IMAGE="ghcr.io/$(echo "$GH_REPO" | tr '[:upper:]' '[:lower:]')"
           if [ -n "$RELEASE_TAG" ]; then
             python -c 'import re,sys; assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", sys.argv[1])' "$VERSION"
             test "$VERSION" = "$RELEASE_TAG"
             gh release view "$RELEASE_TAG" --json isDraft,isPrerelease --jq 'select(.isDraft == false and .isPrerelease == false)' | python -c 'import json,sys; assert json.load(sys.stdin)'
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "ghcr_image=$GHCR_IMAGE" >> "$GITHUB_OUTPUT"
           echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Check Docker Hub credentials
+        id: dockerhub
+        if: github.event_name != 'pull_request'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Docker Hub secrets are not configured; publishing to GHCR only (see #498)."
+          fi
       - uses: docker/setup-buildx-action@v4
       - name: Build image
         uses: docker/build-push-action@v7
@@ -60,6 +79,7 @@ jobs:
           cache-from: type=gha,scope=docker-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=docker-${{ matrix.arch }}
           labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.revision=${{ steps.version.outputs.revision }}
       - name: Test CLI and bundled weights offline
@@ -69,14 +89,31 @@ jobs:
           docker run --rm --network none mhcflurry-test:local mhcflurry --version
           docker run --rm --network none mhcflurry-test:local mhcflurry downloads info
           docker run --rm --network none mhcflurry-test:local python /opt/mhcflurry/docker/smoke.py "$VERSION"
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested architecture to GHCR
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_BASE: ${{ steps.version.outputs.ghcr_image }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          IMAGE="$IMAGE_BASE:$VERSION-$ARCH"
+          docker tag mhcflurry-test:local "$IMAGE"
+          docker push "$IMAGE"
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && steps.dockerhub.outputs.configured == 'true'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish tested architecture
-        if: github.event_name != 'pull_request'
+      - name: Publish tested architecture to Docker Hub
+        if: github.event_name != 'pull_request' && steps.dockerhub.outputs.configured == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
           ARCH: ${{ matrix.arch }}
@@ -91,11 +128,34 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish multi-platform tags to GHCR
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.ghcr_image }}
+          VERSION: ${{ needs.build.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          IMAGE="$IMAGE_BASE:$VERSION"
+          docker buildx imagetools create -t "$IMAGE" "$IMAGE-amd64" "$IMAGE-arm64"
+          LATEST=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)
+          if [ "$VERSION" = "$LATEST" ]; then
+            docker buildx imagetools create -t "$IMAGE_BASE:latest" "$IMAGE"
+          fi
+          docker buildx imagetools inspect "$IMAGE"
+      - name: Log in to Docker Hub
+        if: needs.build.outputs.has_dockerhub == 'true'
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish multi-platform tags
+      - name: Publish multi-platform tags to Docker Hub
+        if: needs.build.outputs.has_dockerhub == 'true'
         env:
           VERSION: ${{ needs.build.outputs.version }}
           GH_TOKEN: ${{ github.token }}

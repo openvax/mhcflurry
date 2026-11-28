@@ -92,6 +92,8 @@ numpydoc_show_class_members = False
 
 html_theme = 'sphinx_rtd_theme'
 
+html_static_path = ['_static']
+
 html_last_updated_fmt = ""
 
 html_domain_indices = False
