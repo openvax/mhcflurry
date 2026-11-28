@@ -1,51 +1,40 @@
 # Experiment log
 
 Dated empirical studies, cross-species validation campaigns, and controlled
-ablation experiments supporting MHCflurry releases.
+ablations supporting MHCflurry releases.
 
-## 2.5 series
+## 2.5 series — cross-species & pan-class studies
 
-- **{doc}`whitepaper_25x_cross_species`** *(Unified 2.5.x Technical Whitepaper
-  + [Downloadable PDF](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf))* —
-  Synthesizes all three `2.5.x` empirical studies below into a single
-  publication-ready web whitepaper and vector PDF covering pan-vertebrate
-  Class I affinity & presentation across `223` species, audited Cattle
-  `BoLA-I` / Dog `DLA-88` MS benchmarks, bit-identical `--lock-existing`
-  training parity, and the exploratory Class I → Class II transfer study.
-- {doc}`experiment_25x_cattle_dog_hitlist` *(2026-11-26)* — Audited Cattle
-  `BoLA-I` (PXD008151, `21,332` strictly peptide-disjoint flanked MS ligands)
-  and Dog `DLA-88` validation on the refreshed `hitlist` bundle: demonstrates
-  why auditing all three bundled `2.3.0` training tables is mandatory (catching
-  `100%` in-sample overlap on `hitlist` `DLA-88` and PMID 36423003 `BoLA-I`
-  cohorts), benchmarks `BoLA-I` Presentation (+ real `Bos taurus` flanks,
-  `0.902–0.960` AUROC), and ablates ultra-few-shot bovine alleles (`4–12`
-  training rows).
-- {doc}`experiment_25x_pan_class_ii` *(2026-11-25)* — Speculative zero-shot
-  Class I → Class II transfer test: mapping Class II `DR`/`DQ`/`DP`
-  heterodimers into MHCflurry's 39-aa groove representation via `mhcseqs`
-  pan-class IMGT G-DOMAIN alignments and benchmarking frozen Class I `2.3.0`
-  weights against `NetMHCIIpan-4.3` and an `HLA-A*02:01` negative control
-  across 15 alleles (`7,500` 15-mer IC50 pairs).
-- {doc}`experiment_25x_cross_species_hitlist` *(2026-11-25)* — Zero-shot
-  Class I Affinity and Presentation (+ real species proteome flanks) validation
-  across 11 previously unseen vertebrate species and 3 binding-pocket mutants
-  using [`hitlist`](https://github.com/pirl-unc/hitlist) + IEDB, taxonomic
-  expansion census (`+184` net new species in `mhcseqs`), and controlled A/B
-  pan-allele training parity (`Max |Δ| = 0.0`, `r = 1.0`) validating the
-  `GENERATE.sh --lock-existing` migration.
+- **{doc}`whitepaper_25x_cross_species`** ([Download PDF](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf)) —
+  Unified technical whitepaper synthesizing all three `2.5.x` studies below
+  with 7 publication vector figures, summary tables, and practical guidance.
+- {doc}`experiment_25x_cattle_dog_hitlist` *(2026-11-26)* —
+  Training-overlap audit and strictly peptide-disjoint evaluation of Cattle
+  (`BoLA-I`, `21,332` flanked MS ligands) and Dog (`DLA-88`) cohorts from
+  [`hitlist`](https://github.com/pirl-unc/hitlist).
+- {doc}`experiment_25x_pan_class_ii` *(2026-11-25)* —
+  Exploratory zero-shot test of frozen Class I `2.3.0` weights on 15 Class II
+  `HLA-DR`/`DQ`/`DP` alleles using
+  [`mhcseqs`](https://github.com/pirl-unc/mhcseqs) alignments, benchmarked
+  against `NetMHCIIpan-4.3`.
+- {doc}`experiment_25x_cross_species_hitlist` *(2026-11-25)* —
+  Zero-shot Class I affinity and presentation benchmarks across 11 unseen
+  vertebrate species and 3 pocket mutants, plus bit-identical `--lock-existing`
+  training parity for [`mhcseqs`](https://github.com/pirl-unc/mhcseqs).
 
-## 2.3 series
+## 2.3 series — model release evaluation
 
 - {doc}`release_model_evaluation` & {doc}`release_model_evaluation_details` —
-  Head-to-head benchmarks of the released `2.3.0` PyTorch weights against
-  historical `2.2.0` weights and external predictors.
-- {doc}`dla_validation` — Exploratory canine DLA-88 evaluation and training
-  evidence audit.
-- {doc}`final_230_candidate_experiment` — Clean-checkout replay of the `2.3.0`
-  pan-allele release training recipe.
+  Head-to-head benchmarks of the `2.3.0` PyTorch weights against `2.2.0`,
+  NetMHCpan, and MixMHCpred.
+- {doc}`dla_validation` —
+  Canine (`DLA`) allele capability report, training-data overlap audit, and
+  evaluation limits.
+- {doc}`final_230_candidate_experiment` —
+  Clean-checkout replay of the `2.3.0` pan-allele training recipe.
 
 Additional working ablation notes (cleavage-boundary sweeps, kernel-width
-sweeps, and historical public-data replays) live in the repository's
+sweeps, and historical replays) live in the repository's
 [`notes/` directory](https://github.com/openvax/mhcflurry/tree/master/notes).
 
 ```{toctree}

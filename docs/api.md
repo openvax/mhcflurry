@@ -16,7 +16,7 @@ Most Python callers only need the top-level predictors and download helpers:
 | {class}`~mhcflurry.Class1ProcessingPredictor` | Antigen processing predictor (with or without N/C flanking sequences). |
 | {class}`~mhcflurry.CompactPercentRankTransform` | Compact knot-based percentile rank transform for affinity, processing, and presentation calibration. |
 | {mod}`mhcflurry.downloads` | Locates downloaded model weights and catalogue releases (`get_path`, `get_downloads_dir`, `resolve_data_location`). |
-| {mod}`mhcflurry.pseudosequences` | Extracts `mhcseqs`-backed Class I binding-groove pseudosequences from arbitrary heavy-chain sequences or `mhcseqs` tables (`extract_class1_pseudosequence`, `build_pseudosequences_from_mhcseqs`). |
+| {mod}`mhcflurry.pseudosequences` | Extracts the 39 peptide-contacting MHC class I positions (*pseudosequence*) from any heavy-chain protein sequence or from the optional [`mhcseqs`](https://github.com/pirl-unc/mhcseqs) sequence database (`extract_class1_pseudosequence`, `build_pseudosequences_from_mhcseqs`). |
 
 Parallelism helpers live in {mod}`mhcflurry.parallelism` and CLI modules live
 under `mhcflurry.cli.*`.

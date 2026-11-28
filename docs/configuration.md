@@ -82,8 +82,11 @@ caches, offline execution, debugging, and controlled benchmarks. See
   processing components. Otherwise, uses the active release's presentation bundle.
 
 `MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR`
-: Path to the default standalone processing predictor. Otherwise, uses the
-  active release's standalone processing bundle.
+: Path to the default processing predictor. Without this override,
+  `Class1ProcessingPredictor.load()` uses the active release's standalone
+  processing bundle when installed, then falls back to the with-flanks
+  processing component of its presentation bundle. Explicit model paths take
+  precedence.
 
 `MHCFLURRY_OPTIMIZATION_LEVEL`
 : Controls pan-allele ensemble merging. The default, `1`, enables the faster
