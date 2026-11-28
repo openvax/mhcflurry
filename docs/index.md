@@ -12,15 +12,12 @@ by MHC class I molecules.
 
 ## User guides
 
+- {doc}`interpreting_predictions` — understand each output score, pick the right
+  column to rank by, and choose practical cutoffs.
+- {doc}`scanning_proteins` — scan protein FASTA files and whole proteomes,
+  filter hits, and avoid common CLI pitfalls.
 - {doc}`model_downloads` — browse available model weights, manage your local cache,
   and select historical weight releases.
-- {doc}`cross_species_validation` — predict on newly sequenced vertebrate species
-  and engineered MHC mutants using the optional
-  [`mhcseqs`](https://github.com/pirl-unc/mhcseqs) sequence database.
-- {doc}`release_model_evaluation` — compare MHCflurry's released `2.3.0` weights
-  against earlier releases and external predictors.
-- {doc}`training` — train custom models on your own binding or mass-spectrometry data.
-- {doc}`evaluation` — compare a custom model against a released one.
 
 ## Reference
 
@@ -32,6 +29,13 @@ by MHC class I molecules.
 
 ## Advanced topics
 
+- {doc}`cross_species_validation` — predict on newly sequenced vertebrate species
+  and engineered MHC mutants using the optional
+  [`mhcseqs`](https://github.com/pirl-unc/mhcseqs) sequence database.
+- {doc}`training` — train custom models on your own binding or mass-spectrometry data.
+- {doc}`evaluation` — compare a custom model against a released one.
+- {doc}`release_model_evaluation` — compare MHCflurry's released `2.3.0` weights
+  against earlier releases and external predictors.
 - {doc}`shared_percent_rank_transforms` — custom percentile-rank calibration.
 - {doc}`training_provenance` — verify whether evaluation samples overlap a model's
   training data.
@@ -56,11 +60,9 @@ docker
 :caption: User guides
 :hidden:
 
+interpreting_predictions
+scanning_proteins
 model_downloads
-cross_species_validation
-release_model_evaluation
-training
-evaluation
 ```
 
 ```{toctree}
@@ -79,6 +81,10 @@ changelog
 :caption: Advanced topics
 :hidden:
 
+cross_species_validation
+training
+evaluation
+release_model_evaluation
 shared_percent_rank_transforms
 training_provenance
 experiments
@@ -92,6 +98,4 @@ experiments
 maintainers
 testing
 development
-orchestrator
-auto_sizing_audit
 ```

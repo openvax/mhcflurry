@@ -105,13 +105,16 @@ mass-spectrometry cohorts using [`hitlist`](https://github.com/pirl-unc/hitlist)
 - **Known failure mode — pocket insertions:** Alleles with multi-residue
   insertions inside a peptide-binding pocket (such as black flying fox bat
   `Ptal-N*01:01`, which has a 3-residue insertion at position 51) are poorly
-  captured by fixed 39-aa pseudosequences. Always check alignment warnings and
-  compare against an unrelated negative-control allele (such as `HLA-A*02:01`)
-  when evaluating a small non-model dataset.
+  captured by fixed 39-aa pseudosequences (`0.540` AUROC on real vs.
+  residue-scrambled ligands). Always check alignment warnings and compare
+  against a **mismatched real-allele null distribution** and **within-peptide
+  scrambled ligands** when evaluating a small non-model dataset.
 - **Class I weights do not transfer to Class II:** Testing structurally aligned
-  Class II pseudosequences on frozen Class I weights gives `0.551` AUROC (worse
-  than an `HLA-A*02:01` negative control and far below `NetMHCIIpan-4.3` at
-  `0.923`). Use a dedicated Class II predictor for Class II alleles.
+  Class II pseudosequences on frozen Class I weights gives `0.551` AUROC
+  (matching a 30-allele mismatched Class I null at `0.549`, collapsing to
+  `0.502` on real vs. residue-scrambled binders, and far below
+  `NetMHCIIpan-4.3` at `0.923` / `0.725` scrambled). Use a dedicated Class II
+  predictor for Class II alleles.
 
 ## Full whitepaper, figures & validation logs
 

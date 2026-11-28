@@ -7,7 +7,8 @@
 - Use {doc}`testing` for the fast local loop and full verification commands.
 - Use {doc}`development` for internal API and compatibility-shim conventions.
 - Use {doc}`orchestrator` when changing worker processes, hardware planning, or
-  training data residency.
+  training data residency, and {doc}`auto_sizing_audit` for the planner's
+  resource-sizing invariants.
 
 ## Training and model releases
 
@@ -53,6 +54,8 @@ others reference.
 :maxdepth: 1
 :hidden:
 
+orchestrator
+auto_sizing_audit
 release_training_recipe
 release_neural_hyperparameter_audit
 final_230_candidate_experiment
