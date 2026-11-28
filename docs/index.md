@@ -22,6 +22,10 @@ presentation.
 - {doc}`cross_species_validation` shows how to predict on newly sequenced
   species and pocket mutants via `mhcseqs`, and reports zero-shot cross-species
   validation benchmarks.
+- {doc}`whitepaper_25x_cross_species` is the unified MHCflurry 2.5 technical
+  whitepaper (with downloadable vector PDF) covering all 223 vertebrate species,
+  zero-shot Class I affinity & presentation, audited Cattle `BoLA-I` / Dog
+  `DLA-88` benchmarks, and the experimental Class I → Class II boundary test.
 - {doc}`experiments` collects dated validation campaigns, cross-species
   benchmarks, and controlled ablation studies.
 - {doc}`training` fits custom models from your own measurements.
@@ -63,6 +67,7 @@ model_downloads
 release_model_evaluation
 dla_validation
 cross_species_validation
+whitepaper_25x_cross_species
 experiments
 training
 evaluation

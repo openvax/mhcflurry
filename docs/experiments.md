@@ -5,6 +5,13 @@ ablation experiments supporting MHCflurry releases.
 
 ## 2.5 series
 
+- **{doc}`whitepaper_25x_cross_species`** *(Unified 2.5.x Technical Whitepaper
+  + [Downloadable PDF](_static/whitepaper/mhcflurry_25x_cross_species_whitepaper.pdf))* —
+  Synthesizes all three `2.5.x` empirical studies below into a single
+  publication-ready web whitepaper and vector PDF covering pan-vertebrate
+  Class I affinity & presentation across `223` species, audited Cattle
+  `BoLA-I` / Dog `DLA-88` MS benchmarks, bit-identical `--lock-existing`
+  training parity, and the exploratory Class I → Class II transfer study.
 - {doc}`experiment_25x_cattle_dog_hitlist` *(2026-11-26)* — Audited Cattle
   `BoLA-I` (PXD008151, `21,332` strictly peptide-disjoint flanked MS ligands)
   and Dog `DLA-88` validation on the refreshed `hitlist` bundle: demonstrates
